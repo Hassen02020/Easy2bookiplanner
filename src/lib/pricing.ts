@@ -1,6 +1,4 @@
-import { db } from "@/db"
-import { pricingRules } from "@/db/schema"
-import { eq, and, isNull, or, desc } from "drizzle-orm"
+import { getActivePricingRules } from "@/lib/services/pricingService"
 
 export type PricingRuleType = "markup_percentage" | "discount_fixed" | "override"
 export type ServiceType = "hotel" | "flight" | "trip"
@@ -40,32 +38,26 @@ export async function calculateDisplayPrice(
   destination?: string | null,
   category?: string | null
 ): Promise<number> {
-  const categoryConditions = category
-    ? [eq(pricingRules.category, category), eq(pricingRules.category, "generic")]
-    : [eq(pricingRules.category, "generic")]
+  const activeRules = await getActivePricingRules()
 
-  const destinationConditions = destination
-    ? [eq(pricingRules.destination, destination), isNull(pricingRules.destination)]
-    : [isNull(pricingRules.destination)]
-
-  const rows = await db
-    .select()
-    .from(pricingRules)
-    .where(
-      and(
-        eq(pricingRules.isActive, true),
-        or(...categoryConditions),
-        or(...destinationConditions)
+  const categoryMatches = category
+    ? activeRules.filter(
+        (rule) => rule.category === category || rule.category === "generic"
       )
-    )
-    .orderBy(desc(pricingRules.destination))
+    : activeRules.filter((rule) => rule.category === "generic")
 
-  const rules: PricingRule[] = rows.map((row) => ({
-    category: row.category,
-    destination: row.destination,
-    ruleType: row.ruleType,
-    value: Number(row.value),
-    isActive: row.isActive,
+  const destinationMatches = destination
+    ? categoryMatches.filter(
+        (rule) => rule.destination === destination || rule.destination === null
+      )
+    : categoryMatches.filter((rule) => rule.destination === null)
+
+  const rules: PricingRule[] = destinationMatches.map((rule) => ({
+    category: rule.category,
+    destination: rule.destination,
+    ruleType: rule.ruleType,
+    value: Number(rule.value),
+    isActive: rule.isActive,
   }))
 
   return applyPricingRules(rawPrice, rules)
