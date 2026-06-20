@@ -17,6 +17,12 @@ function getDb() {
 
 export const db = new Proxy({} as ReturnType<typeof drizzle<typeof schema>>, {
   get(_target, prop) {
-    return Reflect.get(getDb(), prop)
+    const value = Reflect.get(getDb(), prop)
+    // Les méthodes Drizzle (transaction, select, etc.) doivent être liées au vrai client
+    // pour conserver le bon contexte `this` et éviter les bugs de transaction.
+    if (typeof value === "function") {
+      return value.bind(getDb())
+    }
+    return value
   },
 })

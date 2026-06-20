@@ -16,6 +16,7 @@ export interface AvailabilityResult {
   remaining: number
   total: number
   isSoldOut: boolean
+  notFound: boolean
 }
 
 export interface BookingResult {
@@ -43,7 +44,8 @@ export async function checkAvailability(packageId: string): Promise<Availability
       triggerUrgence: false,
       remaining: 0,
       total: 0,
-      isSoldOut: true,
+      isSoldOut: false,
+      notFound: true,
     }
   }
 
@@ -58,6 +60,7 @@ export async function checkAvailability(packageId: string): Promise<Availability
     remaining,
     total: row.totalSlots,
     isSoldOut: row.isSoldOut,
+    notFound: false,
   }
 }
 
@@ -170,12 +173,14 @@ export async function releaseSlots(
 
       const row = rows[0]
       const newBooked = Math.max(0, row.bookedSlots - slots)
+      // Dès que des places sont libérées, le package n'est plus complet.
+      const isSoldOut = newBooked >= row.totalSlots
 
       await tx
         .update(packageInventory)
         .set({
           bookedSlots: newBooked,
-          isSoldOut: newBooked >= row.totalSlots,
+          isSoldOut,
         })
         .where(eq(packageInventory.id, packageId))
 

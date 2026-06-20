@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm"
 import {
   pgTable,
   uuid,
@@ -11,6 +12,7 @@ import {
   pgEnum,
   index,
   uniqueIndex,
+  check,
 } from "drizzle-orm/pg-core"
 
 export const languageEnum = pgEnum("language", ["fr", "ar", "en"])
@@ -194,5 +196,6 @@ export const packageInventory = pgTable(
     categoryIdx: index("package_inventory_category_idx").on(table.category),
     destinationIdx: index("package_inventory_destination_idx").on(table.destination),
     soldOutIdx: index("package_inventory_sold_out_idx").on(table.isSoldOut),
+    bookedSlotsCheck: check("package_inventory_booked_slots_check", sql`${table.bookedSlots} <= ${table.totalSlots}`),
   })
 )

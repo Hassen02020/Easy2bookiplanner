@@ -74,7 +74,8 @@ CREATE TABLE IF NOT EXISTS "package_inventory" (
 	"threshold_urgency" integer DEFAULT 3 NOT NULL,
 	"is_sold_out" boolean DEFAULT false NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "package_inventory_booked_slots_check" CHECK ("package_inventory"."booked_slots" <= "package_inventory"."total_slots")
 );
 --> statement-breakpoint
 CREATE TABLE IF NOT EXISTS "pricing_rules" (

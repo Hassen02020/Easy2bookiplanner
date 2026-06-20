@@ -1,13 +1,21 @@
 "use client"
 
+import { useMemo } from "react"
 import Script from "next/script"
 
 const PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID
+
+function generateEventId(): string {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`
+}
 
 export function MetaPixel() {
   if (!PIXEL_ID) {
     return null
   }
+
+  // eventId unique partagé entre le Pixel navigateur et la CAPI serveur pour la déduplication.
+  const pageViewEventId = useMemo(generateEventId, [])
 
   return (
     <>
@@ -25,7 +33,7 @@ export function MetaPixel() {
             s.parentNode.insertBefore(t,s)}(window, document,'script',
             'https://connect.facebook.net/en_US/fbevents.js');
             fbq('init', '${PIXEL_ID}');
-            fbq('track', 'PageView');
+            fbq('track', 'PageView', {}, { eventID: '${pageViewEventId}' });
           `,
         }}
       />

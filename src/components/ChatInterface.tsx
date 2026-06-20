@@ -98,74 +98,73 @@ export function ChatInterface({ className }: ChatInterfaceProps) {
     }
   }, [i18n.language])
 
-  const handleSend = useCallback(async () => {
-    const text = input.trim()
-    if (!text || isLoading) return
+  const handleSend = useCallback(
+    async (textToSend?: string) => {
+      const text = (textToSend ?? input).trim()
+      if (!text || isLoading) return
 
-    const inferredLang = detectLanguageForPayload(text)
-    if (inferredLang !== detectedLang) {
-      setDetectedLang(inferredLang)
-      await i18n.changeLanguage(inferredLang)
-    }
-
-    const userMessage: ChatMessage = {
-      id: `msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-      role: "user",
-      content: text,
-    }
-
-    setMessages((prev) => [...prev, userMessage])
-    setInput("")
-    setIsLoading(true)
-
-    try {
-      const response = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messages: [...messages, userMessage].map((m) => ({
-            role: m.role,
-            content: m.content,
-          })),
-          lang: inferredLang,
-        }),
-      })
-
-      if (!response.ok) {
-        throw new Error("Chat request failed")
+      const inferredLang = detectLanguageForPayload(text)
+      if (inferredLang !== detectedLang) {
+        setDetectedLang(inferredLang)
+        await i18n.changeLanguage(inferredLang)
       }
 
-      const data = await response.json()
-      const assistantMessage: ChatMessage = {
+      const userMessage: ChatMessage = {
         id: `msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-        role: "assistant",
-        content: data.content || t("errors.generic"),
-        results: data.results,
+        role: "user",
+        content: text,
       }
-      setMessages((prev) => [...prev, assistantMessage])
-    } catch (error) {
-      console.error("Chat error:", error)
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `err_${Date.now()}`,
+
+      setMessages((prev) => [...prev, userMessage])
+      setInput("")
+      setIsLoading(true)
+
+      try {
+        const response = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            messages: [...messages, userMessage].map((m) => ({
+              role: m.role,
+              content: m.content,
+            })),
+            lang: inferredLang,
+          }),
+        })
+
+        if (!response.ok) {
+          throw new Error("Chat request failed")
+        }
+
+        const data = await response.json()
+        const assistantMessage: ChatMessage = {
+          id: `msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
           role: "assistant",
-          content: t("errors.generic"),
-        },
-      ])
-    } finally {
-      setIsLoading(false)
-      inputRef.current?.focus()
-    }
-  }, [input, isLoading, messages, detectedLang, i18n, t])
+          content: data.content || t("errors.generic"),
+          results: data.results,
+        }
+        setMessages((prev) => [...prev, assistantMessage])
+      } catch (error) {
+        console.error("Chat error:", error)
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `err_${Date.now()}`,
+            role: "assistant",
+            content: t("errors.generic"),
+          },
+        ])
+      } finally {
+        setIsLoading(false)
+        inputRef.current?.focus()
+      }
+    },
+    [input, isLoading, messages, detectedLang, i18n, t]
+  )
 
   const handleTranscription = useCallback(
-    async (text: string) => {
-      setInput(text)
-      // Petit délai pour permettre au state de se mettre à jour avant l'envoi.
-      setTimeout(() => {
-        handleSend()
-      }, 50)
+    (text: string) => {
+      handleSend(text)
     },
     [handleSend]
   )

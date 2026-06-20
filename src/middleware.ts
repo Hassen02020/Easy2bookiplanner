@@ -5,8 +5,10 @@ import { NextRequest, NextResponse } from "next/server"
  *
  * Middleware global de sécurité pour Easy2Book.
  * - Applique des en-têtes de sécurité sur toutes les réponses.
- * - Protège les routes webhook avec validation d'origine stricte.
  * - Implémente un rate limiting basique par IP sur les routes coûteuses en tokens OpenAI.
+ *
+ * Note : la route webhook Facebook (/api/webhooks/facebook-leads) est exclue du matcher
+ * car la validation de signature est gérée de manière autonome dans le route handler.
  */
 
 export const config = {
@@ -55,10 +57,6 @@ function isRateLimited(ip: string): boolean {
   return entry.count > RATE_LIMIT_MAX_REQUESTS
 }
 
-function isWebhookRequest(pathname: string): boolean {
-  return pathname.startsWith("/api/webhooks/")
-}
-
 function isVoiceChatRequest(pathname: string): boolean {
   return pathname === "/api/chat/voice" || pathname === "/api/chat/voice-to-text"
 }
@@ -72,26 +70,6 @@ function applySecurityHeaders(response: NextResponse): NextResponse {
 
 export function middleware(request: NextRequest): NextResponse {
   const pathname = request.nextUrl.pathname
-
-  // Protection des webhooks : on laisse passer uniquement les requêtes GET (validation Meta)
-  // ou les POST avec l'en-tête de signature X-Hub-Signature-256 présent.
-  if (isWebhookRequest(pathname)) {
-    const method = request.method
-    const signature = request.headers.get("x-hub-signature-256")
-
-    if (method === "GET") {
-      return applySecurityHeaders(NextResponse.next())
-    }
-
-    if (method === "POST" && signature) {
-      return applySecurityHeaders(NextResponse.next())
-    }
-
-    return new NextResponse(
-      JSON.stringify({ error: "Requête webhook non autorisée." }),
-      { status: 403, headers: { "Content-Type": "application/json" } }
-    )
-  }
 
   // Rate limiting sur les routes vocales (coût OpenAI élevé).
   if (isVoiceChatRequest(pathname) && request.method === "POST") {

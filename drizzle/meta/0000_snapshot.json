@@ -1,5 +1,5 @@
 {
-  "id": "d843c8e7-349e-4619-a5cf-92e6f41bce5f",
+  "id": "dd1ff79f-21d3-486c-b19d-088cb6ded45f",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -714,7 +714,12 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "package_inventory_booked_slots_check": {
+          "name": "package_inventory_booked_slots_check",
+          "value": "\"package_inventory\".\"booked_slots\" <= \"package_inventory\".\"total_slots\""
+        }
+      },
       "isRLSEnabled": false
     },
     "public.pricing_rules": {

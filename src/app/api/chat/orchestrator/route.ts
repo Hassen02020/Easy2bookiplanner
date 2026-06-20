@@ -339,12 +339,15 @@ function buildSystemPrompt(
     triggerUrgence: boolean
     remaining: number
     isSoldOut: boolean
+    notFound: boolean
   },
   intent: TravelIntent,
   context: string
 ): string {
   const basePrice = `${price.toFixed(2)} TND`
-  const urgency = availability.triggerUrgence
+  const urgency = availability.notFound
+    ? `📦 STOCK NON RÉFÉRENCÉ : ce package n'a pas encore de suivi de places. Présente le prix indicatif et oriente vers WhatsApp pour vérifier la disponibilité.`
+    : availability.triggerUrgence
     ? `⚠️ URGENCE STOCK : il ne reste plus que ${availability.remaining} place(s) disponible(s). Insiste légèrement pour que l'utilisateur réserve rapidement.`
     : availability.isSoldOut
     ? `❌ STOCK ÉPUISÉ : ce package est complet. Propose à l'utilisateur de s'inscrire sur liste d'attente ou d'explorer une alternative.`
@@ -466,6 +469,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           remaining: 0,
           total: 0,
           isSoldOut: false,
+          notFound: true,
         }
 
     // Contexte additionnel
@@ -527,7 +531,8 @@ Historique : ${previousMessages.length > 0 ? " conversation en cours" : " premi�
     }
 
     // Flags frontend
-    const showBookingForm = availability.available && !availability.isSoldOut && !explorerMode
+    const showBookingForm =
+      availability.available && !availability.isSoldOut && !availability.notFound && !explorerMode
     const showUrgency = availability.triggerUrgence
 
     parsed.flags = {
