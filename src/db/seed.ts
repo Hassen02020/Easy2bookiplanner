@@ -6,6 +6,7 @@ import {
   organizedTrips,
   organizedTripTranslations,
   pricingRules,
+  packageInventory,
 } from "./schema"
 import "dotenv/config"
 
@@ -265,12 +266,43 @@ async function seed() {
     },
   ])
 
+  await db.insert(packageInventory).values([
+    {
+      packageName: "Istanbul Classique 7 jours",
+      category: "istanbul",
+      destination: "Istanbul",
+      totalSlots: 18,
+      bookedSlots: 12,
+      thresholdUrgency: 3,
+      isSoldOut: false,
+    },
+    {
+      packageName: "Capverde Soleil 8 jours",
+      category: "generic",
+      destination: "Cap-Vert",
+      totalSlots: 12,
+      bookedSlots: 9,
+      thresholdUrgency: 2,
+      isSoldOut: false,
+    },
+    {
+      packageName: "Omra Prestige 9 jours",
+      category: "omra",
+      destination: "Makkah",
+      totalSlots: 20,
+      bookedSlots: 20,
+      thresholdUrgency: 3,
+      isSoldOut: true,
+    },
+  ])
+
   console.log("[seed] Insertion des données terminée.")
   console.log("[seed] Résumé :")
   console.log("  - Hôtels : 4 établissements avec traductions FR/AR/EN")
   console.log("  - Vols : 3 vols (Tunisair, Tunisair Express)")
   console.log("  - Voyages organisés : 3 packages (Istanbul, Cap-Vert, Omra)")
   console.log("  - Règles de tarification : Omra +8%, Istanbul override, Hammamet -30 TND")
+  console.log("  - Stocks : 3 packages avec seuils d'urgence et états sold-out")
   console.log("[seed] Fermeture de la connexion et sortie.")
 }
 

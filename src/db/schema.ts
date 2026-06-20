@@ -175,3 +175,24 @@ export const leadRequests = pgTable(
     geoIdx: index("lead_requests_geo_idx").on(table.detectedCity, table.detectedRegion),
   })
 )
+
+export const packageInventory = pgTable(
+  "package_inventory",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    packageName: varchar("package_name", { length: 255 }).notNull(),
+    category: varchar("category", { length: 50 }).notNull(),
+    destination: varchar("destination", { length: 100 }),
+    totalSlots: integer("total_slots").notNull(),
+    bookedSlots: integer("booked_slots").default(0).notNull(),
+    thresholdUrgency: integer("threshold_urgency").default(3).notNull(),
+    isSoldOut: boolean("is_sold_out").default(false).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().$onUpdate(() => new Date()).notNull(),
+  },
+  (table) => ({
+    categoryIdx: index("package_inventory_category_idx").on(table.category),
+    destinationIdx: index("package_inventory_destination_idx").on(table.destination),
+    soldOutIdx: index("package_inventory_sold_out_idx").on(table.isSoldOut),
+  })
+)
