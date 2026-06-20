@@ -10,7 +10,8 @@ import {
 import "dotenv/config"
 
 async function seed() {
-  console.log("Seeding database...")
+  console.log("[seed] Démarrage du seeding Easy2Book...")
+  console.log("[seed] Chargement des variables d'environnement et connexion à la base...")
 
   const seededHotels = await db
     .insert(hotels)
@@ -157,14 +158,21 @@ async function seed() {
   ])
 
   await db.insert(pricingRules).values([
-    { category: "hotel", destination: "Hammamet", ruleType: "markup_percentage", value: "15", isActive: true },
+    // 1. Omra : majoration globale de 8%
+    { category: "omra", ruleType: "markup_percentage", value: "8", isActive: true },
+
+    // 2. Voyage organisé Istanbul : prix forcé (override) pour tester le moteur
+    { category: "istanbul", destination: "Istanbul", ruleType: "override", value: "1890.00", isActive: true },
+
+    // 3. Hôtels locaux Hammamet : remise fixe de 30 TND (Early Booking / dernière minute)
+    { category: "hotel", destination: "Hammamet", ruleType: "discount_fixed", value: "30", isActive: true },
+
+    // Règles génériques complémentaires pour enrichir le jeu de données
     { category: "hotel", destination: "Sousse", ruleType: "markup_percentage", value: "12", isActive: true },
     { category: "hotel", destination: "Tabarka", ruleType: "markup_percentage", value: "10", isActive: true },
     { category: "hotel", destination: "Djerba", ruleType: "markup_percentage", value: "18", isActive: true },
     { category: "flight", ruleType: "markup_percentage", value: "8", isActive: true },
     { category: "generic", ruleType: "markup_percentage", value: "10", isActive: true },
-    { category: "istanbul", destination: "Istanbul", ruleType: "discount_fixed", value: "50", isActive: true },
-    { category: "omra", ruleType: "override", value: "3850.00", isActive: true },
   ])
 
   const seededTrips = await db
@@ -257,12 +265,21 @@ async function seed() {
     },
   ])
 
-  console.log("Seeding completed successfully.")
+  console.log("[seed] Insertion des données terminée.")
+  console.log("[seed] Résumé :")
+  console.log("  - Hôtels : 4 établissements avec traductions FR/AR/EN")
+  console.log("  - Vols : 3 vols (Tunisair, Tunisair Express)")
+  console.log("  - Voyages organisés : 3 packages (Istanbul, Cap-Vert, Omra)")
+  console.log("  - Règles de tarification : Omra +8%, Istanbul override, Hammamet -30 TND")
+  console.log("[seed] Fermeture de la connexion et sortie.")
 }
 
 seed()
+  .then(() => {
+    console.log("[seed] ✅ Seeding terminé avec succès.")
+    process.exit(0)
+  })
   .catch((error) => {
-    console.error("Seeding failed:", error)
+    console.error("[seed] ❌ Seeding failed:", error)
     process.exit(1)
   })
-  .finally(() => process.exit(0))
