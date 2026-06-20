@@ -5,15 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1781975036752,
-      "tag": "0000_previous_sauron",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1781975315313,
-      "tag": "0001_faulty_kingpin",
+      "when": 1781994229057,
+      "tag": "0000_brief_tomas",
       "breakpoints": true
     }
   ]

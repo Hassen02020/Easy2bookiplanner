@@ -60,7 +60,7 @@ export async function searchHotels(
   return Promise.all(
     results.map(async (hotel) => {
       const rawPrice = Number(hotel.basePricePerNight)
-      const displayPrice = await calculateDisplayPrice("hotel", rawPrice, hotel.destination)
+      const displayPrice = await calculateDisplayPrice("hotel", rawPrice, hotel.destination, "hotel")
       return {
         ...hotel,
         basePricePerNight: rawPrice,
@@ -99,7 +99,8 @@ export async function searchTrips(
   return Promise.all(
     results.map(async (trip) => {
       const rawPrice = Number(trip.price)
-      const displayPrice = await calculateDisplayPrice("trip", rawPrice, destination)
+      const category = inferCategoryFromDestination(destination)
+      const displayPrice = await calculateDisplayPrice("trip", rawPrice, destination, category)
       return {
         ...trip,
         price: rawPrice,
@@ -107,4 +108,12 @@ export async function searchTrips(
       }
     })
   )
+}
+
+function inferCategoryFromDestination(destination: string): string {
+  const lower = destination.toLowerCase()
+  if (lower.includes("omra")) return "omra"
+  if (lower.includes("istanbul")) return "istanbul"
+  if (lower.includes("turquie") || lower.includes("turkey")) return "turkey"
+  return "generic"
 }

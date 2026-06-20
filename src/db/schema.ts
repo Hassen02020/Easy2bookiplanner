@@ -125,21 +125,28 @@ export const flights = pgTable(
   })
 )
 
+export const ruleTypeEnum = pgEnum("rule_type", [
+  "markup_percentage",
+  "discount_fixed",
+  "override",
+])
+
 export const pricingRules = pgTable(
   "pricing_rules",
   {
-    id: uuid("id").primaryKey().defaultRandom(),
-    serviceType: serviceTypeEnum("service_type").notNull(),
-    destination: varchar("destination", { length: 255 }),
-    markupPercent: numeric("markup_percent", { precision: 5, scale: 2 }).default("1.10").notNull(),
-    fixedDiscount: numeric("fixed_discount", { precision: 10, scale: 2 }).default("0").notNull(),
-    overridePrice: numeric("override_price", { precision: 10, scale: 2 }),
+    id: uuid("id").defaultRandom().primaryKey(),
+    category: varchar("category", { length: 50 }).notNull(),
+    destination: varchar("destination", { length: 100 }),
+    ruleType: ruleTypeEnum("rule_type").notNull(),
+    value: numeric("value", { precision: 10, scale: 2 }).notNull(),
     isActive: boolean("is_active").default(true).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().$onUpdate(() => new Date()).notNull(),
   },
   (table) => ({
-    serviceTypeIdx: index("pricing_rules_service_type_idx").on(table.serviceType),
+    categoryIdx: index("pricing_rules_category_idx").on(table.category),
     destinationIdx: index("pricing_rules_destination_idx").on(table.destination),
+    ruleTypeIdx: index("pricing_rules_rule_type_idx").on(table.ruleType),
     activeIdx: index("pricing_rules_active_idx").on(table.isActive),
   })
 )

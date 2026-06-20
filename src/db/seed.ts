@@ -157,13 +157,14 @@ async function seed() {
   ])
 
   await db.insert(pricingRules).values([
-    { serviceType: "hotel", destination: "Hammamet", markupPercent: "1.15", fixedDiscount: "0", isActive: true },
-    { serviceType: "hotel", destination: "Sousse", markupPercent: "1.12", fixedDiscount: "0", isActive: true },
-    { serviceType: "hotel", destination: "Tabarka", markupPercent: "1.10", fixedDiscount: "0", isActive: true },
-    { serviceType: "hotel", destination: "Djerba", markupPercent: "1.18", fixedDiscount: "0", isActive: true },
-    { serviceType: "flight", markupPercent: "1.08", fixedDiscount: "0", isActive: true },
-    { serviceType: "trip", markupPercent: "1.10", fixedDiscount: "0", isActive: true },
-    { serviceType: "trip", destination: "Istanbul", markupPercent: "1.10", fixedDiscount: "50", isActive: true },
+    { category: "hotel", destination: "Hammamet", ruleType: "markup_percentage", value: "15", isActive: true },
+    { category: "hotel", destination: "Sousse", ruleType: "markup_percentage", value: "12", isActive: true },
+    { category: "hotel", destination: "Tabarka", ruleType: "markup_percentage", value: "10", isActive: true },
+    { category: "hotel", destination: "Djerba", ruleType: "markup_percentage", value: "18", isActive: true },
+    { category: "flight", ruleType: "markup_percentage", value: "8", isActive: true },
+    { category: "generic", ruleType: "markup_percentage", value: "10", isActive: true },
+    { category: "istanbul", destination: "Istanbul", ruleType: "discount_fixed", value: "50", isActive: true },
+    { category: "omra", ruleType: "override", value: "3850.00", isActive: true },
   ])
 
   const seededTrips = await db

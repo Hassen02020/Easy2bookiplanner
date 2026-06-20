@@ -1,5 +1,6 @@
 CREATE TYPE "public"."language" AS ENUM('fr', 'ar', 'en');--> statement-breakpoint
 CREATE TYPE "public"."lead_status" AS ENUM('pending', 'converted_lead', 'redirected_whatsapp');--> statement-breakpoint
+CREATE TYPE "public"."rule_type" AS ENUM('markup_percentage', 'discount_fixed', 'override');--> statement-breakpoint
 CREATE TYPE "public"."service_type" AS ENUM('hotel', 'flight', 'trip');--> statement-breakpoint
 CREATE TABLE IF NOT EXISTS "flights" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
@@ -63,6 +64,17 @@ CREATE TABLE IF NOT EXISTS "organized_trips" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE IF NOT EXISTS "pricing_rules" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"category" varchar(50) NOT NULL,
+	"destination" varchar(100),
+	"rule_type" "rule_type" NOT NULL,
+	"value" numeric(10, 2) NOT NULL,
+	"is_active" boolean DEFAULT true NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE IF NOT EXISTS "users" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"first_name" varchar(255),
@@ -104,5 +116,9 @@ CREATE INDEX IF NOT EXISTS "lead_requests_status_idx" ON "lead_requests" USING b
 CREATE INDEX IF NOT EXISTS "lead_requests_ip_idx" ON "lead_requests" USING btree ("client_ip");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "lead_requests_geo_idx" ON "lead_requests" USING btree ("detected_city","detected_region");--> statement-breakpoint
 CREATE UNIQUE INDEX IF NOT EXISTS "organized_trip_translations_trip_lang_unique_idx" ON "organized_trip_translations" USING btree ("trip_id","language");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "pricing_rules_category_idx" ON "pricing_rules" USING btree ("category");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "pricing_rules_destination_idx" ON "pricing_rules" USING btree ("destination");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "pricing_rules_rule_type_idx" ON "pricing_rules" USING btree ("rule_type");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "pricing_rules_active_idx" ON "pricing_rules" USING btree ("is_active");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "users_email_idx" ON "users" USING btree ("email");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "users_phone_idx" ON "users" USING btree ("phone");

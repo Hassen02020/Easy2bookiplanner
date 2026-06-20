@@ -30,7 +30,7 @@ export function trackClientPixel(event: MetaEventPayload) {
 }
 
 export async function sendServerCapiEvent(event: MetaEventPayload) {
-  const response = await fetch("/api/integrations/meta-capi", {
+  const response = await fetch("/api/track", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
