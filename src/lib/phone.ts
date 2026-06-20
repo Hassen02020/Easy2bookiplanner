@@ -30,6 +30,8 @@ export function normalizePhone(phone: string): string {
   return formatToE164(phone, "216")
 }
 
+export const sanitizeTunisianPhone = normalizePhone
+
 export function phoneErrorMessage(phone: string): string {
   const digits = phone.replace(/\D/g, "")
   if (digits.length < 8) return "Numéro incomplet. 8 chiffres requis après l'indicatif +216."
