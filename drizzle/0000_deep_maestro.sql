@@ -2,6 +2,17 @@ CREATE TYPE "public"."language" AS ENUM('fr', 'ar', 'en');--> statement-breakpoi
 CREATE TYPE "public"."lead_status" AS ENUM('pending', 'converted_lead', 'redirected_whatsapp');--> statement-breakpoint
 CREATE TYPE "public"."rule_type" AS ENUM('markup_percentage', 'discount_fixed', 'override');--> statement-breakpoint
 CREATE TYPE "public"."service_type" AS ENUM('hotel', 'flight', 'trip');--> statement-breakpoint
+CREATE TABLE IF NOT EXISTS "ai_market_trends" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"session_id" varchar(255) NOT NULL,
+	"detected_destination" varchar(100),
+	"detected_category" varchar(50),
+	"budget_mention" varchar(50),
+	"raw_keywords" text[],
+	"detected_language" varchar(50),
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE IF NOT EXISTS "flights" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"airline" varchar(255) NOT NULL,
@@ -119,6 +130,10 @@ EXCEPTION
  WHEN duplicate_object THEN null;
 END $$;
 --> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "ai_market_trends_session_idx" ON "ai_market_trends" USING btree ("session_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "ai_market_trends_destination_idx" ON "ai_market_trends" USING btree ("detected_destination");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "ai_market_trends_category_idx" ON "ai_market_trends" USING btree ("detected_category");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "ai_market_trends_created_at_idx" ON "ai_market_trends" USING btree ("created_at");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "flights_departure_idx" ON "flights" USING btree ("departure_airport");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "flights_arrival_idx" ON "flights" USING btree ("arrival_airport");--> statement-breakpoint
 CREATE UNIQUE INDEX IF NOT EXISTS "hotel_translations_hotel_lang_unique_idx" ON "hotel_translations" USING btree ("hotel_id","language");--> statement-breakpoint

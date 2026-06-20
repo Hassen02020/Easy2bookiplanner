@@ -199,3 +199,23 @@ export const packageInventory = pgTable(
     bookedSlotsCheck: check("package_inventory_booked_slots_check", sql`${table.bookedSlots} <= ${table.totalSlots}`),
   })
 )
+
+export const aiMarketTrends = pgTable(
+  "ai_market_trends",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    sessionId: varchar("session_id", { length: 255 }).notNull(),
+    detectedDestination: varchar("detected_destination", { length: 100 }),
+    detectedCategory: varchar("detected_category", { length: 50 }),
+    budgetMention: varchar("budget_mention", { length: 50 }),
+    rawKeywords: text("raw_keywords").array(),
+    detectedLanguage: varchar("detected_language", { length: 50 }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    sessionIdx: index("ai_market_trends_session_idx").on(table.sessionId),
+    destinationIdx: index("ai_market_trends_destination_idx").on(table.detectedDestination),
+    categoryIdx: index("ai_market_trends_category_idx").on(table.detectedCategory),
+    createdAtIdx: index("ai_market_trends_created_at_idx").on(table.createdAt),
+  })
+)

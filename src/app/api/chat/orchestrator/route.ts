@@ -3,7 +3,7 @@ import { z } from "zod"
 import { calculateDisplayPrice } from "@/lib/pricing"
 import { checkAvailability } from "@/db/inventory"
 import { db } from "@/db"
-import { packageInventory } from "@/db/schema"
+import { packageInventory, aiMarketTrends } from "@/db/schema"
 import { eq, and, sql } from "drizzle-orm"
 
 /**
@@ -19,6 +19,7 @@ import { eq, and, sql } from "drizzle-orm"
 const requestSchema = z.object({
   message: z.string().min(1),
   lang: z.enum(["fr", "en", "ar"]).optional().default("fr"),
+  sessionId: z.string().min(1).optional().default("anonymous"),
   previousMessages: z
     .array(
       z.object({
@@ -416,7 +417,13 @@ Tu dois répondre en JSON strictement valide avec cette structure :
     "totalEstimatedCost": "<estimation en TND>",
     "valueForMoneyScore": <score 1-10>
   },
-  "suggestedPackage": "<slug du package recommandé : istanbul_trendy, omra_prestige, tunisia_explorer, albania_vfm, etc. ou null>"
+  "suggestedPackage": "<slug du package recommandé : istanbul_trendy, omra_prestige, tunisia_explorer, albania_vfm, etc. ou null>",
+  "metadata": {
+    "destination": "<destination principale détectée ou null>",
+    "category": "<omra | voyage_organise | alternative | hotel | generic>",
+    "budget": "<economique | luxe | flexible | null>",
+    "keywords": ["<mot-clé 1>", "<mot-clé 2>"]
+  }
 }
 
 La propriété "message" doit être un texte fluide en français premium (ou Derja si approprié). Les clés de l'itinéraire sont en anglais pour le frontend. Ne mets pas de markdown à l'intérieur du JSON.
@@ -442,7 +449,7 @@ ${urgency}
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const body = requestSchema.parse(await request.json())
-    const { message, lang, previousMessages } = body
+    const { message, lang, sessionId, previousMessages } = body
 
     const intent = detectIntent(message, lang)
     const { category, destination, explorerMode, durationDays } = intent
@@ -520,15 +527,50 @@ Historique : ${previousMessages.length > 0 ? " conversation en cours" : " premi�
       },
     }
 
+    let metadata: {
+      destination: string | null
+      category: string | null
+      budget: string | null
+      keywords: string[]
+    } = {
+      destination: destination ?? null,
+      category: category ?? null,
+      budget: null,
+      keywords: [],
+    }
+
     try {
       const json = JSON.parse(rawContent)
       parsed.message = typeof json.message === "string" ? json.message : ""
       parsed.itinerary = json.itinerary || null
       parsed.suggestedPackage = json.suggestedPackage || null
+
+      if (json.metadata && typeof json.metadata === "object") {
+        metadata.destination = typeof json.metadata.destination === "string" ? json.metadata.destination : destination ?? null
+        metadata.category = typeof json.metadata.category === "string" ? json.metadata.category : category ?? null
+        metadata.budget = typeof json.metadata.budget === "string" ? json.metadata.budget : null
+        metadata.keywords = Array.isArray(json.metadata.keywords) ? json.metadata.keywords.filter((k: unknown) => typeof k === "string") : []
+      }
     } catch {
       // Fallback : si le modèle ne retourne pas du JSON, on renvoie le texte brut
       parsed.message = rawContent || "Je suis désolé, je n'ai pas pu formuler une réponse structurée."
     }
+
+    // Enregistrement des tendances en arrière-plan (fire-and-forget, zéro latence pour le client)
+    Promise.resolve()
+      .then(() =>
+        db.insert(aiMarketTrends).values({
+          sessionId,
+          detectedDestination: metadata.destination,
+          detectedCategory: metadata.category,
+          budgetMention: metadata.budget,
+          rawKeywords: metadata.keywords,
+          detectedLanguage: intent.language === "ar" ? "derja" : "français",
+        })
+      )
+      .catch((error) => {
+        console.error("[orchestrator] background trend insert failed:", error)
+      })
 
     // Flags frontend
     const showBookingForm =
