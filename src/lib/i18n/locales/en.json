@@ -1,0 +1,40 @@
+{
+  "app": {
+    "title": "Easy2Book Travel Planner",
+    "subtitle": "Your AI travel companion",
+    "welcome": "Hi! I'm your Easy2Book assistant. Tell me where you want to go and I'll find the best deals in Tunisia and beyond."
+  },
+  "language": {
+    "fr": "Français",
+    "en": "English",
+    "ar": "العربية",
+    "switch": "Language"
+  },
+  "chat": {
+    "placeholder": "Type or record a voice message...",
+    "send": "Send",
+    "record": "Hold to record",
+    "recording": "Recording...",
+    "stop": "Stop",
+    "thinking": "Assistant is thinking...",
+    "book_now": "Book now",
+    "from": "From",
+    "per_night": "/ night",
+    "seats_left": "seats left",
+    "manifest": "Booking manifest"
+  },
+  "lead": {
+    "title": "Complete your request",
+    "first_name": "First name",
+    "last_name": "Last name",
+    "phone": "Phone",
+    "email": "Email",
+    "submit": "Get my quote on WhatsApp",
+    "whatsapp_redirect": "You will be redirected to WhatsApp..."
+  },
+  "errors": {
+    "audio_not_supported": "Audio recording is not supported on this browser.",
+    "whisper_failed": "Could not transcribe audio. Please try again or type your message.",
+    "generic": "Something went wrong. Please try again."
+  }
+}
