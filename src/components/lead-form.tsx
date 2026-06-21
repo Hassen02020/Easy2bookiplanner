@@ -50,7 +50,6 @@ export function LeadForm({ serviceType, destination, calculatedPrice, aiSummary,
     setSubmitError(null)
 
     try {
-      const eventId = generateEventId()
       const normalizedPhone = normalizePhone(data.phone)
 
       const result = await submitLead({
@@ -68,10 +67,7 @@ export function LeadForm({ serviceType, destination, calculatedPrice, aiSummary,
       })
 
       const numericPrice = parseFloat(calculatedPrice) || 0
-
-      trackClientPixel({
-        eventName: "Lead",
-        eventId,
+      const payload = {
         email: data.email,
         phone: normalizedPhone,
         firstName: data.firstName,
@@ -80,76 +76,28 @@ export function LeadForm({ serviceType, destination, calculatedPrice, aiSummary,
         contentCategory: serviceType,
         value: numericPrice,
         currency: "TND",
-      })
+      }
 
-      await sendServerCapiEvent({
-        eventName: "Lead",
-        eventId,
-        email: data.email,
-        phone: normalizedPhone,
-        firstName: data.firstName,
-        lastName: data.lastName,
-        contentName: destination,
-        contentCategory: serviceType,
-        value: numericPrice,
-        currency: "TND",
-      })
+      // Lead
+      const leadEventId = generateEventId()
+      trackClientPixel({ ...payload, eventName: "Lead", eventId: leadEventId })
+      sendServerCapiEvent({ ...payload, eventName: "Lead", eventId: leadEventId }).catch((e) =>
+        console.error("[Lead CAPI]", e)
+      )
 
       // InitiateCheckout : intention de paiement forte
       const checkoutEventId = generateEventId()
-      trackClientPixel({
-        eventName: "InitiateCheckout",
-        eventId: checkoutEventId,
-        email: data.email,
-        phone: normalizedPhone,
-        firstName: data.firstName,
-        lastName: data.lastName,
-        contentName: destination,
-        contentCategory: serviceType,
-        value: numericPrice,
-        currency: "TND",
-      })
+      trackClientPixel({ ...payload, eventName: "InitiateCheckout", eventId: checkoutEventId })
+      sendServerCapiEvent({ ...payload, eventName: "InitiateCheckout", eventId: checkoutEventId }).catch((e) =>
+        console.error("[InitiateCheckout CAPI]", e)
+      )
 
-      await sendServerCapiEvent({
-        eventName: "InitiateCheckout",
-        eventId: checkoutEventId,
-        email: data.email,
-        phone: normalizedPhone,
-        firstName: data.firstName,
-        lastName: data.lastName,
-        contentName: destination,
-        contentCategory: serviceType,
-        value: numericPrice,
-        currency: "TND",
-      })
-
-      // Purchase simulé (depuis le point de vue du pixel : engagement financier)
+      // Purchase : engagement financier
       const purchaseEventId = generateEventId()
-      trackClientPixel({
-        eventName: "Purchase",
-        eventId: purchaseEventId,
-        email: data.email,
-        phone: normalizedPhone,
-        firstName: data.firstName,
-        lastName: data.lastName,
-        contentName: destination,
-        contentCategory: serviceType,
-        value: numericPrice,
-        currency: "TND",
-      })
-
-      await sendServerCapiEvent({
-        eventName: "Purchase",
-        eventId: purchaseEventId,
-        email: data.email,
-        phone: normalizedPhone,
-        firstName: data.firstName,
-        lastName: data.lastName,
-        contentName: destination,
-        contentCategory: serviceType,
-        value: numericPrice,
-        currency: "TND",
-      })
+      trackClientPixel({ ...payload, eventName: "Purchase", eventId: purchaseEventId })
+      sendServerCapiEvent({ ...payload, eventName: "Purchase", eventId: purchaseEventId }).catch((e) =>
+        console.error("[Purchase CAPI]", e)
+      )
 
       setWhatsappLink(result.whatsappLink)
     } catch (err) {

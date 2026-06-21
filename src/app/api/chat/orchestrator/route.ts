@@ -620,7 +620,7 @@ Si l'utilisateur demande un plan de voyage complet, tu DOIS générer de manièr
 À partir du **Jour 3**, tronque la réponse et injecte EXACTEMENT ce texte de conversion dans le champ "morning" de chaque jour :
 "[🔒 CONTENU PREMIUM VERROUILLÉ] Pour débloquer la suite de votre itinéraire exclusif jour par jour, obtenir les coordonnées de la maison d'hôte, du guide local, et bloquer votre tarif préférentiel en TND, veuillez finaliser votre demande ci-dessous pour recevoir votre lien de paiement d'acompte."
 
-Les autres champs des jours 3+ (midday, afternoon, evening, estimatedCost) doivent être vides ou null.
+Les autres champs des jours 3+ (midday, afternoon, evening) doivent être vides ou null.
 L'API retournera en parallèle le drapeau structuré showLeadForm: true.
 `
 
@@ -886,6 +886,24 @@ ${passMember ? "Client membre PASS : bypass des marges sur hôtels locaux et tou
       parsed.message = rawContent || "Je suis désolé, je n'ai pas pu formuler une réponse structurée."
     }
 
+    // Vérrouillage serveur : troncature après le Jour 2 pour empêcher tout contournement du prompt
+    if (parsed.itinerary && Array.isArray(parsed.itinerary.days) && parsed.itinerary.days.length > 2) {
+      const paywallMessage =
+        "[🔒 CONTENU PREMIUM VERROUILLÉ] Pour débloquer la suite de votre itinéraire exclusif jour par jour, obtenir les coordonnées de la maison d'hôte, du guide local, et bloquer votre tarif préférentiel en TND, veuillez finaliser votre demande ci-dessous pour recevoir votre lien de paiement d'acompte."
+      const unlockedDays = parsed.itinerary.days.slice(0, 2)
+      for (let i = 2; i < parsed.itinerary.days.length; i++) {
+        unlockedDays.push({
+          day: i + 1,
+          morning: paywallMessage,
+          midday: "",
+          afternoon: "",
+          evening: "",
+          estimatedCost: null,
+        })
+      }
+      parsed.itinerary.days = unlockedDays
+    }
+
     // Enregistrement des tendances et du voyage généré en arrière-plan (fire-and-forget)
     Promise.resolve()
       .then(async () => {
@@ -895,7 +913,7 @@ ${passMember ? "Client membre PASS : bypass des marges sur hôtels locaux et tou
           detectedCategory: metadata.category,
           budgetMention: metadata.budget,
           rawKeywords: metadata.keywords,
-          detectedLanguage: intent.language === "ar" ? "derja" : "français",
+          detectedLanguage: intent.language === "ar" ? "derja" : intent.language === "en" ? "english" : "français",
           requestedDates: metadata.requestedDates,
         })
 
