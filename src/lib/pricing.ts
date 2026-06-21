@@ -11,7 +11,12 @@ export interface PricingRule {
   isActive: boolean
 }
 
-export function applyPricingRules(basePrice: number, rules: PricingRule[]): number {
+export function applyPricingRules(
+  basePrice: number,
+  rules: PricingRule[],
+  isPassMember: boolean = false,
+  category?: string | null
+): number {
   const activeRules = rules.filter((rule) => rule.isActive)
 
   const overrideRule = activeRules.find((rule) => rule.ruleType === "override")
@@ -20,8 +25,13 @@ export function applyPricingRules(basePrice: number, rules: PricingRule[]): numb
   }
 
   let finalPrice = basePrice
+  const bypassCategories = ["hotel", "alternative", "explorer"]
+  const shouldBypassMarkup = isPassMember && category && bypassCategories.includes(category)
 
   for (const rule of activeRules) {
+    if (rule.ruleType === "markup_percentage" && shouldBypassMarkup) {
+      continue
+    }
     if (rule.ruleType === "markup_percentage") {
       finalPrice = finalPrice * (1 + Number(rule.value) / 100)
     } else if (rule.ruleType === "discount_fixed") {
@@ -36,7 +46,8 @@ export async function calculateDisplayPrice(
   serviceType: ServiceType,
   rawPrice: number,
   destination?: string | null,
-  category?: string | null
+  category?: string | null,
+  isPassMember: boolean = false
 ): Promise<number> {
   const activeRules = await getActivePricingRules()
 
@@ -63,7 +74,7 @@ export async function calculateDisplayPrice(
     isActive: rule.isActive,
   }))
 
-  return applyPricingRules(rawPrice, rules)
+  return applyPricingRules(rawPrice, rules, isPassMember, category)
 }
 
 export function formatPrice(price: number, currency: string = "TND"): string {

@@ -117,6 +117,16 @@ CREATE TABLE IF NOT EXISTS "pricing_rules" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE IF NOT EXISTS "user_wallets" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"user_phone" varchar(50) NOT NULL,
+	"eco_credits" integer DEFAULT 0 NOT NULL,
+	"membership_status" varchar(20) DEFAULT 'free' NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "user_wallets_user_phone_unique" UNIQUE("user_phone")
+);
+--> statement-breakpoint
 CREATE TABLE IF NOT EXISTS "users" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"first_name" varchar(255),
@@ -172,5 +182,7 @@ CREATE INDEX IF NOT EXISTS "pricing_rules_category_idx" ON "pricing_rules" USING
 CREATE INDEX IF NOT EXISTS "pricing_rules_destination_idx" ON "pricing_rules" USING btree ("destination");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "pricing_rules_rule_type_idx" ON "pricing_rules" USING btree ("rule_type");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "pricing_rules_active_idx" ON "pricing_rules" USING btree ("is_active");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "user_wallets_phone_idx" ON "user_wallets" USING btree ("user_phone");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "user_wallets_status_idx" ON "user_wallets" USING btree ("membership_status");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "users_email_idx" ON "users" USING btree ("email");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "users_phone_idx" ON "users" USING btree ("phone");

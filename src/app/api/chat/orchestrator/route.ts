@@ -9,6 +9,13 @@ import {
 } from "@/lib/services/destinationFilters"
 import { parseFamilyStructure, allocateRooms, containsFamilyStructure } from "@/utils/familyParser"
 import { findPackagesWithinBudget } from "@/utils/budgetMatcher"
+import { isPassMember } from "@/lib/services/loyaltyService"
+import { findGuidesByZone } from "@/lib/services/guidesService"
+import {
+  detectLowBudgetIntent,
+  generateLowBudgetItinerary,
+  getHeritageBudgetActivities,
+} from "@/utils/lowBudgetOptimizer"
 import { db } from "@/db"
 import { packageInventory, aiMarketTrends, clientTrips } from "@/db/schema"
 import { eq, and, sql } from "drizzle-orm"
@@ -27,6 +34,7 @@ const requestSchema = z.object({
   message: z.string().min(1),
   lang: z.enum(["fr", "en", "ar"]).optional().default("fr"),
   sessionId: z.string().min(1).optional().default("anonymous"),
+  userPhone: z.string().optional(),
   previousMessages: z
     .array(
       z.object({
@@ -49,6 +57,7 @@ interface TravelIntent {
   explorerMode: boolean
   durationDays: number | null
   visaFree: boolean
+  lowBudget: boolean
   family: {
     adults: number
     children: number
@@ -98,6 +107,13 @@ interface OrchestratorResponse {
     savings: number
     details: string
   }> | null
+  lowBudget: {
+    active: boolean
+    accommodations: string[]
+    freeActivities: string[]
+    paidActivities: string[]
+    tips: string[]
+  }
   flags: {
     showBookingForm: boolean
     showUrgency: boolean
@@ -109,6 +125,7 @@ interface OrchestratorResponse {
     destination: string | null
     explorerMode: boolean
     visaFree: boolean
+    lowBudget: boolean
   }
 }
 
@@ -189,6 +206,61 @@ const ALTERNATIVE_WORLD_SPOTS = [
     highlights: ["villages traditionnels de Sumba", "plages de Marosi", "cascades de Lapopu"],
   },
 ]
+
+// ============================================================================
+// BASE DE CONNAISSANCES "RICHESSES DE LA TUNISIE"
+// ============================================================================
+
+const TUNISIAN_HERITAGE = {
+  ruins: {
+    title: "Ruines & Archéologie",
+    items: [
+      { name: "Dougga", note: "Site romain UNESCO, guide officiel recommandé" },
+      { name: "Sbeïtla", note: "Triade de temples romains dans un cadre naturel" },
+      { name: "Bulla Regia", note: "Villas romaines souterraines uniques" },
+      { name: "Makthar", note: "Site moins fréquenté, très abordable" },
+      { name: "El Jem", note: "Troisième plus grand amphithéâtre romain, incontournable" },
+      { name: "Utique", note: "Ruines phénico-puniques au bord de la mer" },
+      { name: "Carthage", note: "Patrimoine mondial, à visiter avec un guide certifié" },
+    ],
+  },
+  terroir: {
+    title: "Produits du Terroir & Maisons d'Hôtes",
+    items: [
+      { name: "Miel de Beni Mtir", note: "Miel de montagne, dégustation chez producteur" },
+      { name: "Huile d'olive de Mornag", note: "Domaines familiaux avec table d'hôte" },
+      { name: "Huile d'olive de Sfax", note: "Visites de moulin et dégustation" },
+      { name: "Harissa de Nabeul", note: "Artisanale et familiale" },
+      { name: "Figues de Djebba", note: "Séchées et fraîches, achat direct" },
+      { name: "Fromages artisanaux de Béja", note: "Fermes locales avec accueil" },
+    ],
+  },
+  fauna: {
+    title: "Faune & Flore",
+    items: [
+      { name: "Flamants roses", note: "Lac de Tunis et Djerba, observation gratuite" },
+      { name: "Parc National de l'Ichkeul", note: "Buffles, oiseaux migrateurs, UNESCO" },
+      { name: "Parc de Bouhedma", note: "Gazelles et paysages sahéliens" },
+      { name: "Ain Draham", note: "Forêts de chênes-lièges, randonnées balisées" },
+    ],
+  },
+  festivals: {
+    title: "Festivals & Cérémonies",
+    items: [
+      { name: "Symphonies d'El Jem", note: "Concerts classiques dans l'amphithéâtre" },
+      { name: "Jazz de Tabarka", note: "Festival international en bord de mer" },
+      { name: "Festival du Sahara à Douz", note: "Traditions sahariennes, musique, méharées" },
+      { name: "Fêtes des agrumes à Nabeul", note: "Parfums, couleurs et animations" },
+    ],
+  },
+  aquaparks: {
+    title: "Divertissement & Parcs Aquatiques",
+    items: [
+      { name: "Nahrawess", note: "Parc aquatique à proximité de Tunis, tarifs famille" },
+      { name: "Safa Aquapark", note: "Toboggan et piscines pour familles" },
+    ],
+  },
+}
 
 // ============================================================================
 // DÉTECTION D'INTENTION
@@ -322,6 +394,7 @@ function detectIntent(text: string, preferredLang: SupportedLanguage): TravelInt
   const explorerMode = detectExplorerMode(text)
   const durationDays = detectDurationDays(text)
   const visaFree = detectVisaFreeIntent(text)
+  const lowBudget = detectLowBudgetIntent(text)
 
   const familyStructure = containsFamilyStructure(text) ? parseFamilyStructure(text) : null
   const family = familyStructure
@@ -343,6 +416,7 @@ function detectIntent(text: string, preferredLang: SupportedLanguage): TravelInt
     explorerMode,
     durationDays,
     visaFree,
+    lowBudget,
     family,
   }
 }
@@ -368,6 +442,21 @@ async function findInventoryPackage(
     .limit(1)
 
   return rows[0]?.id || null
+}
+
+async function fetchLocalGuides(destination: string | null): Promise<
+  Array<{
+    name: string
+    activity: string
+    pricePerPerson: number
+    duration: string
+    maxGroupSize: number
+    languages: string[]
+    description: string
+  }>
+> {
+  if (!destination) return []
+  return findGuidesByZone(destination)
 }
 
 function estimateRawPrice(category: TravelCategory, destination: string | null): number {
@@ -412,13 +501,14 @@ function buildSystemPrompt(
   const priceLine = `Prix indicatif affiché : **${basePrice}** (hors vols internationaux selon cas). Précise toujours que le devis final est envoyé sur WhatsApp.`
 
   const antiAgency = `
-## POSTURE : Concepteur d'Expériences Easy2Book
+## POSTURE : Ambassadeur Passionné du Patrimoine Tunisien
 
-Tu n'es PAS une agence de voyage classique. Tu es un concepteur d'expériences haut de gamme, connecté aux tendances 2026. Règles absolues :
+Tu n'es PAS une agence de voyage classique. Tu es un ambassadeur passionné du patrimoine, de la nature et du terroir tunisien, connecté aux tendances 2026. Règles absolues :
 - **Zéro circuits de groupe de 50 personnes** au pas de course.
-- **Zéro catalogue hôtelier standard**. Tu proposes des pépites, des éco-lodges, des tables d'hôtes, des spots insolites.
+- **Zéro catalogue hôtelier standard**. Tu proposes des pépites, des éco-lodges, des maisons d'hôtes, des tables d'hôtes, des spots insolites.
 - **Smart Price** : tu maximises le pouvoir d'achat du voyageur tunisien. Évite les pièges à touristes, privilégie le value-for-money.
-- **Miroir linguistique** : français haut de gamme et professionnel par défaut. Si l'utilisateur utilise la Derja tunisienne, intègre naturellement des tournures familières tunisiennes sans casser le niveau de service premium.
+- **Miroir linguistique** : français haut de gamme, chaleureux et inspirant. Si l'utilisateur utilise la Derja tunisienne, intègre naturellement des tournures familières tunisiennes sans casser le niveau de service premium.
+- **Ambassadeur du patrimoine** : ne propose pas mécaniquement "Hôtel à Hammamet". Construis des expériences : *"Je vous propose de séjourner dans une magnifique maison d'hôte près de Dougga. Le matin, vous visitez les ruines romaines sublimes loin des bus de touristes, et le midi, vous dégustez un couscous au mérou traditionnel préparé avec l'huile d'olive de leur propre domaine..."*
 - **Ne promets jamais un prix final fixe** : toujours "À partir de" ou "Estimation indicative".
 `
 
@@ -437,7 +527,34 @@ Si l'utilisateur demande "Où aller en Tunisie cet automne ?", NE réponds pas "
 - Immersion troglodyte de charme chez l'habitant à Toujane ou Matmata.
 - Retraite de nature au Cap Serrat ou à Haouaria.
 - Kayak dans les criques cachées de Ghar El Melh.
+
+## RICHESSES DE LA TUNISIE (à proposer spontanément quand c'est pertinent)
+
+### Ruines & Archéologie
+${TUNISIAN_HERITAGE.ruins.items.map((i) => `- **${i.name}** : ${i.note}.`).join("\n")}
+
+### Terroir & Maisons d'Hôtes
+${TUNISIAN_HERITAGE.terroir.items.map((i) => `- **${i.name}** : ${i.note}.`).join("\n")}
+
+### Faune & Flore
+${TUNISIAN_HERITAGE.fauna.items.map((i) => `- **${i.name}** : ${i.note}.`).join("\n")}
+
+### Festivals & Cérémonies
+${TUNISIAN_HERITAGE.festivals.items.map((i) => `- **${i.name}** : ${i.note}.`).join("\n")}
+
+### Divertissement & Parcs Aquatiques
+${TUNISIAN_HERITAGE.aquaparks.items.map((i) => `- **${i.name}** : ${i.note}.`).join("\n")}
 `
+
+  const lowBudgetPlan = intent.lowBudget
+    ? `
+## MODE BUDGET RÉDUIT ACTIVÉ
+${generateLowBudgetItinerary(intent.destination).accommodations.map((a) => `- Hébergement : ${a}`).join("\n")}
+Activités gratuites : ${generateLowBudgetItinerary(intent.destination).freeActivities.join(" ; ")}.
+Activités abordables : ${generateLowBudgetItinerary(intent.destination).paidActivities.join(" ; ")}.
+Conseils : minimise les hôtels internationaux, privilégie les maisons d'hôte, les gîtes ruraux et les activités de plein air.
+`
+    : ""
 
   const dayByDayRules = `
 ## ALGORITHME JOUR PAR JOUR (strict)
@@ -497,6 +614,7 @@ La propriété "message" doit être un texte fluide en français premium (ou Der
 
   return `${antiAgency}
 ${alternativeKb}
+${lowBudgetPlan}
 ${dayByDayRules}
 ${outputFormat}
 
@@ -518,10 +636,13 @@ ${urgency}
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const body = requestSchema.parse(await request.json())
-    const { message, lang, sessionId, previousMessages } = body
+    const { message, lang, sessionId, userPhone, previousMessages } = body
 
     const intent = detectIntent(message, lang)
     const { category, destination, explorerMode, durationDays } = intent
+
+    // Membre Pass : bypass des marges sur hôtels locaux et tourisme alternatif
+    const passMember = userPhone ? await isPassMember(userPhone) : false
 
     // Prix réel après marges dynamiques
     const rawPrice = estimateRawPrice(category, destination)
@@ -532,7 +653,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       serviceType,
       rawPrice,
       destination,
-      pricingCategory
+      pricingCategory,
+      passMember
     )
 
     // Disponibilité des stocks
@@ -548,10 +670,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           notFound: true,
         }
 
+    // Récupération des guides locaux pour enrichir la proposition
+    const localGuides = await fetchLocalGuides(destination)
+
     // Contexte additionnel
     const context = `
 Nombre de jours demandé : ${durationDays || "non précisé"}.
 Historique : ${previousMessages.length > 0 ? " conversation en cours" : " première interaction"}.
+Guides locaux disponibles : ${
+      localGuides.length > 0
+        ? localGuides.map((g) => `${g.activity} (${g.duration}, ${g.pricePerPerson} TND/personne, ${g.maxGroupSize} max)`).join(" ; ")
+        : "aucun"
+    }.
+${passMember ? "Client membre PASS : bypass des marges sur hôtels locaux et tourisme alternatif." : ""}
 `
 
     // Appel GPT-4o
@@ -591,6 +722,13 @@ Historique : ${previousMessages.length > 0 ? " conversation en cours" : " premi�
       clientTripId: null,
       family: null,
       budgetMatches: null,
+      lowBudget: {
+        active: intent.lowBudget,
+        accommodations: [],
+        freeActivities: [],
+        paidActivities: [],
+        tips: [],
+      },
       flags: {
         showBookingForm: false,
         showUrgency: false,
@@ -602,6 +740,7 @@ Historique : ${previousMessages.length > 0 ? " conversation en cours" : " premi�
         destination,
         explorerMode,
         visaFree: intent.visaFree,
+        lowBudget: intent.lowBudget,
       },
     }
 
@@ -696,6 +835,7 @@ Historique : ${previousMessages.length > 0 ? " conversation en cours" : " premi�
         maxBudget,
         category: category === "generic" ? undefined : category,
         destination: destination || undefined,
+        userPhone,
       })
       parsed.budgetMatches = matches.map((m) => ({
         id: m.id,
@@ -706,6 +846,18 @@ Historique : ${previousMessages.length > 0 ? " conversation en cours" : " premi�
         savings: m.savings,
         details: m.details,
       }))
+    }
+
+    // Données optimisateur budget réduit
+    if (intent.lowBudget) {
+      const optimizer = generateLowBudgetItinerary(destination)
+      parsed.lowBudget = {
+        active: true,
+        accommodations: optimizer.accommodations,
+        freeActivities: optimizer.freeActivities,
+        paidActivities: optimizer.paidActivities,
+        tips: optimizer.tips.map((t) => `${t.title}: ${t.description} (${t.estimatedCost}, ${t.savings})`),
+      }
     }
 
     // Flags frontend
@@ -724,6 +876,7 @@ Historique : ${previousMessages.length > 0 ? " conversation en cours" : " premi�
       destination,
       explorerMode,
       visaFree: intent.visaFree,
+      lowBudget: intent.lowBudget,
     }
 
     return NextResponse.json(parsed)

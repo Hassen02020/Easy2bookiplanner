@@ -244,3 +244,19 @@ export const clientTrips = pgTable(
     statusIdx: index("client_trips_status_idx").on(table.status),
   })
 )
+
+export const userWallets = pgTable(
+  "user_wallets",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userPhone: varchar("user_phone", { length: 50 }).notNull().unique(),
+    ecoCredits: integer("eco_credits").default(0).notNull(),
+    membershipStatus: varchar("membership_status", { length: 20 }).default("free").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().$onUpdate(() => new Date()).notNull(),
+  },
+  (table) => ({
+    phoneIdx: index("user_wallets_phone_idx").on(table.userPhone),
+    statusIdx: index("user_wallets_status_idx").on(table.membershipStatus),
+  })
+)

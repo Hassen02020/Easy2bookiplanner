@@ -2,6 +2,7 @@ import { db } from "@/db"
 import { hotels, packageInventory, organizedTrips } from "@/db/schema"
 import { eq, and, gte } from "drizzle-orm"
 import { calculateDisplayPrice } from "@/lib/pricing"
+import { isPassMember } from "@/lib/services/loyaltyService"
 
 /**
  * budgetMatcher.ts
@@ -34,6 +35,7 @@ interface BudgetOptions {
   category?: string
   nights?: number
   destination?: string
+  userPhone?: string
 }
 
 /**
@@ -42,7 +44,8 @@ interface BudgetOptions {
 async function findHotelsWithinBudget(
   maxBudget: number,
   nights: number = 3,
-  destination?: string
+  destination?: string,
+  isPassMember: boolean = false
 ): Promise<BudgetMatch[]> {
   const conditions = [eq(hotels.isActive, true)]
   if (destination) {
@@ -63,7 +66,7 @@ async function findHotelsWithinBudget(
 
   for (const row of rows) {
     const basePrice = Number(row.basePricePerNight) * nights
-    const finalPrice = await calculateDisplayPrice("hotel", basePrice, row.destination, "hotel")
+    const finalPrice = await calculateDisplayPrice("hotel", basePrice, row.destination, "hotel", isPassMember)
 
     if (finalPrice <= maxBudget) {
       matches.push({
@@ -91,7 +94,8 @@ async function findHotelsWithinBudget(
  */
 async function findPackagesWithinInventory(
   maxBudget: number,
-  destination?: string
+  destination?: string,
+  isPassMember: boolean = false
 ): Promise<BudgetMatch[]> {
   const conditions = [eq(packageInventory.isSoldOut, false)]
   if (destination) {
@@ -117,7 +121,7 @@ async function findPackagesWithinInventory(
     const category = row.category || "generic"
     const serviceType: "hotel" | "flight" | "trip" = category === "hotel" ? "hotel" : "trip"
     const basePrice = category === "hotel" ? 320 : 1890
-    const finalPrice = await calculateDisplayPrice(serviceType, basePrice, row.destination, category)
+    const finalPrice = await calculateDisplayPrice(serviceType, basePrice, row.destination, category, isPassMember)
 
     if (finalPrice <= maxBudget) {
       const remaining = row.totalSlots - row.bookedSlots
@@ -146,7 +150,8 @@ async function findPackagesWithinInventory(
  */
 async function findOrganizedTripsWithinBudget(
   maxBudget: number,
-  destination?: string
+  destination?: string,
+  isPassMember: boolean = false
 ): Promise<BudgetMatch[]> {
   const rows = await db
     .select({
@@ -163,7 +168,7 @@ async function findOrganizedTripsWithinBudget(
 
   for (const row of rows) {
     const basePrice = Number(row.price)
-    const finalPrice = await calculateDisplayPrice("trip", basePrice, destination, "voyage")
+    const finalPrice = await calculateDisplayPrice("trip", basePrice, destination, "voyage", isPassMember)
 
     if (finalPrice <= maxBudget) {
       matches.push({
@@ -197,17 +202,19 @@ function formatDate(date: Date): string {
 export async function findPackagesWithinBudget(
   options: BudgetOptions
 ): Promise<BudgetMatch[]> {
-  const { maxBudget, category, nights = 3, destination } = options
+  const { maxBudget, category, nights = 3, destination, userPhone } = options
 
-  const hotelMatches = category && category !== "hotel" ? [] : await findHotelsWithinBudget(maxBudget, nights, destination)
+  const passMember = userPhone ? await isPassMember(userPhone) : false
+
+  const hotelMatches = category && category !== "hotel" ? [] : await findHotelsWithinBudget(maxBudget, nights, destination, passMember)
   const tripMatches =
     category && category !== "trip" && category !== "voyage"
       ? []
-      : await findPackagesWithinInventory(maxBudget, destination)
+      : await findPackagesWithinInventory(maxBudget, destination, passMember)
   const organizedMatches =
     category && category !== "trip" && category !== "voyage"
       ? []
-      : await findOrganizedTripsWithinBudget(maxBudget, destination)
+      : await findOrganizedTripsWithinBudget(maxBudget, destination, passMember)
 
   const all = [...hotelMatches, ...tripMatches, ...organizedMatches]
 
