@@ -42,9 +42,12 @@ export async function calculateDisplayPrice(
 
   const categoryMatches = category
     ? activeRules.filter(
-        (rule) => rule.category === category || rule.category === "generic"
+        (rule) =>
+          rule.category === category ||
+          rule.category === "generic" ||
+          rule.category === "dynamic"
       )
-    : activeRules.filter((rule) => rule.category === "generic")
+    : activeRules.filter((rule) => rule.category === "generic" || rule.category === "dynamic")
 
   const destinationMatches = destination
     ? categoryMatches.filter(

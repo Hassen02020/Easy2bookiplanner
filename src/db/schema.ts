@@ -210,6 +210,7 @@ export const aiMarketTrends = pgTable(
     budgetMention: varchar("budget_mention", { length: 50 }),
     rawKeywords: text("raw_keywords").array(),
     detectedLanguage: varchar("detected_language", { length: 50 }),
+    requestedDates: varchar("requested_dates", { length: 100 }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => ({
@@ -217,5 +218,29 @@ export const aiMarketTrends = pgTable(
     destinationIdx: index("ai_market_trends_destination_idx").on(table.detectedDestination),
     categoryIdx: index("ai_market_trends_category_idx").on(table.detectedCategory),
     createdAtIdx: index("ai_market_trends_created_at_idx").on(table.createdAt),
+  })
+)
+
+export const clientTrips = pgTable(
+  "client_trips",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    sessionId: varchar("session_id", { length: 255 }).notNull(),
+    destination: varchar("destination", { length: 100 }).notNull(),
+    category: varchar("category", { length: 50 }).notNull(),
+    title: varchar("title", { length: 255 }).notNull(),
+    subtitle: varchar("subtitle", { length: 255 }),
+    itinerary: jsonb("itinerary").notNull(),
+    totalEstimatedCost: varchar("total_estimated_cost", { length: 50 }),
+    valueForMoneyScore: integer("value_for_money_score"),
+    calculatedPrice: numeric("calculated_price", { precision: 10, scale: 2 }),
+    status: varchar("status", { length: 50 }).default("draft").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().$onUpdate(() => new Date()).notNull(),
+  },
+  (table) => ({
+    sessionIdx: index("client_trips_session_idx").on(table.sessionId),
+    destinationIdx: index("client_trips_destination_idx").on(table.destination),
+    statusIdx: index("client_trips_status_idx").on(table.status),
   })
 )

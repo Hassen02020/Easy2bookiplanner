@@ -10,7 +10,24 @@ CREATE TABLE IF NOT EXISTS "ai_market_trends" (
 	"budget_mention" varchar(50),
 	"raw_keywords" text[],
 	"detected_language" varchar(50),
+	"requested_dates" varchar(100),
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE IF NOT EXISTS "client_trips" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"session_id" varchar(255) NOT NULL,
+	"destination" varchar(100) NOT NULL,
+	"category" varchar(50) NOT NULL,
+	"title" varchar(255) NOT NULL,
+	"subtitle" varchar(255),
+	"itinerary" jsonb NOT NULL,
+	"total_estimated_cost" varchar(50),
+	"value_for_money_score" integer,
+	"calculated_price" numeric(10, 2),
+	"status" varchar(50) DEFAULT 'draft' NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE IF NOT EXISTS "flights" (
@@ -134,6 +151,9 @@ CREATE INDEX IF NOT EXISTS "ai_market_trends_session_idx" ON "ai_market_trends" 
 CREATE INDEX IF NOT EXISTS "ai_market_trends_destination_idx" ON "ai_market_trends" USING btree ("detected_destination");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "ai_market_trends_category_idx" ON "ai_market_trends" USING btree ("detected_category");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "ai_market_trends_created_at_idx" ON "ai_market_trends" USING btree ("created_at");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "client_trips_session_idx" ON "client_trips" USING btree ("session_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "client_trips_destination_idx" ON "client_trips" USING btree ("destination");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "client_trips_status_idx" ON "client_trips" USING btree ("status");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "flights_departure_idx" ON "flights" USING btree ("departure_airport");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "flights_arrival_idx" ON "flights" USING btree ("arrival_airport");--> statement-breakpoint
 CREATE UNIQUE INDEX IF NOT EXISTS "hotel_translations_hotel_lang_unique_idx" ON "hotel_translations" USING btree ("hotel_id","language");--> statement-breakpoint

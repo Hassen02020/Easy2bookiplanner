@@ -3,7 +3,7 @@ import { z } from "zod"
 import { calculateDisplayPrice } from "@/lib/pricing"
 import { checkAvailability } from "@/db/inventory"
 import { db } from "@/db"
-import { packageInventory, aiMarketTrends } from "@/db/schema"
+import { packageInventory, aiMarketTrends, clientTrips } from "@/db/schema"
 import { eq, and, sql } from "drizzle-orm"
 
 /**
@@ -64,6 +64,7 @@ interface OrchestratorResponse {
   message: string
   itinerary: ItineraryPlan | null
   suggestedPackage: string | null
+  clientTripId: string | null
   flags: {
     showBookingForm: boolean
     showUrgency: boolean
@@ -422,7 +423,8 @@ Tu dois répondre en JSON strictement valide avec cette structure :
     "destination": "<destination principale détectée ou null>",
     "category": "<omra | voyage_organise | alternative | hotel | generic>",
     "budget": "<economique | luxe | flexible | null>",
-    "keywords": ["<mot-clé 1>", "<mot-clé 2>"]
+    "keywords": ["<mot-clé 1>", "<mot-clé 2>"],
+    "requestedDates": "<plage de dates demandée au format JJ/MM/AAAA - JJ/MM/AAAA ou null>"
   }
 }
 
@@ -510,10 +512,16 @@ Historique : ${previousMessages.length > 0 ? " conversation en cours" : " premi�
     })
 
     const rawContent = completion.choices[0]?.message?.content?.trim() || ""
+    const clientTripId =
+      typeof crypto !== "undefined" && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `trip_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+
     let parsed: OrchestratorResponse = {
       message: "",
       itinerary: null,
       suggestedPackage: null,
+      clientTripId: null,
       flags: {
         showBookingForm: false,
         showUrgency: false,
@@ -532,11 +540,13 @@ Historique : ${previousMessages.length > 0 ? " conversation en cours" : " premi�
       category: string | null
       budget: string | null
       keywords: string[]
+      requestedDates: string | null
     } = {
       destination: destination ?? null,
       category: category ?? null,
       budget: null,
       keywords: [],
+      requestedDates: null,
     }
 
     try {
@@ -550,26 +560,45 @@ Historique : ${previousMessages.length > 0 ? " conversation en cours" : " premi�
         metadata.category = typeof json.metadata.category === "string" ? json.metadata.category : category ?? null
         metadata.budget = typeof json.metadata.budget === "string" ? json.metadata.budget : null
         metadata.keywords = Array.isArray(json.metadata.keywords) ? json.metadata.keywords.filter((k: unknown) => typeof k === "string") : []
+        metadata.requestedDates = typeof json.metadata.requestedDates === "string" ? json.metadata.requestedDates : null
       }
     } catch {
       // Fallback : si le modèle ne retourne pas du JSON, on renvoie le texte brut
       parsed.message = rawContent || "Je suis désolé, je n'ai pas pu formuler une réponse structurée."
     }
 
-    // Enregistrement des tendances en arrière-plan (fire-and-forget, zéro latence pour le client)
+    // Enregistrement des tendances et du voyage généré en arrière-plan (fire-and-forget)
     Promise.resolve()
-      .then(() =>
-        db.insert(aiMarketTrends).values({
+      .then(async () => {
+        await db.insert(aiMarketTrends).values({
           sessionId,
           detectedDestination: metadata.destination,
           detectedCategory: metadata.category,
           budgetMention: metadata.budget,
           rawKeywords: metadata.keywords,
           detectedLanguage: intent.language === "ar" ? "derja" : "français",
+          requestedDates: metadata.requestedDates,
         })
-      )
+
+        if (parsed.itinerary && metadata.destination) {
+          parsed.clientTripId = clientTripId
+          await db.insert(clientTrips).values({
+            id: clientTripId,
+            sessionId,
+            destination: metadata.destination,
+            category: metadata.category || category,
+            title: parsed.itinerary.title || `Voyage à ${metadata.destination}`,
+            subtitle: parsed.itinerary.subtitle || null,
+            itinerary: parsed.itinerary,
+            totalEstimatedCost: parsed.itinerary.totalEstimatedCost || null,
+            valueForMoneyScore: parsed.itinerary.valueForMoneyScore ?? null,
+            calculatedPrice: String(finalPrice.toFixed(2)),
+            status: "draft",
+          })
+        }
+      })
       .catch((error) => {
-        console.error("[orchestrator] background trend insert failed:", error)
+        console.error("[orchestrator] background persistence failed:", error)
       })
 
     // Flags frontend
