@@ -19,10 +19,11 @@ interface LeadFormProps {
   destination: string
   calculatedPrice: string
   aiSummary: string
+  remainingSlots?: number | null
   onClose: () => void
 }
 
-export function LeadForm({ serviceType, destination, calculatedPrice, aiSummary, onClose }: LeadFormProps) {
+export function LeadForm({ serviceType, destination, calculatedPrice, aiSummary, remainingSlots, onClose }: LeadFormProps) {
   const { t } = useTranslation()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [whatsappLink, setWhatsappLink] = useState<string | null>(null)
@@ -62,8 +63,11 @@ export function LeadForm({ serviceType, destination, calculatedPrice, aiSummary,
         period: data.period || "Non précisée",
         participants: data.participants || "Non précisé",
         calculatedPrice,
+        remainingSlots,
         aiSummary,
       })
+
+      const numericPrice = parseFloat(calculatedPrice) || 0
 
       trackClientPixel({
         eventName: "Lead",
@@ -74,6 +78,8 @@ export function LeadForm({ serviceType, destination, calculatedPrice, aiSummary,
         lastName: data.lastName,
         contentName: destination,
         contentCategory: serviceType,
+        value: numericPrice,
+        currency: "TND",
       })
 
       await sendServerCapiEvent({
@@ -85,6 +91,64 @@ export function LeadForm({ serviceType, destination, calculatedPrice, aiSummary,
         lastName: data.lastName,
         contentName: destination,
         contentCategory: serviceType,
+        value: numericPrice,
+        currency: "TND",
+      })
+
+      // InitiateCheckout : intention de paiement forte
+      const checkoutEventId = generateEventId()
+      trackClientPixel({
+        eventName: "InitiateCheckout",
+        eventId: checkoutEventId,
+        email: data.email,
+        phone: normalizedPhone,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        contentName: destination,
+        contentCategory: serviceType,
+        value: numericPrice,
+        currency: "TND",
+      })
+
+      await sendServerCapiEvent({
+        eventName: "InitiateCheckout",
+        eventId: checkoutEventId,
+        email: data.email,
+        phone: normalizedPhone,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        contentName: destination,
+        contentCategory: serviceType,
+        value: numericPrice,
+        currency: "TND",
+      })
+
+      // Purchase simulé (depuis le point de vue du pixel : engagement financier)
+      const purchaseEventId = generateEventId()
+      trackClientPixel({
+        eventName: "Purchase",
+        eventId: purchaseEventId,
+        email: data.email,
+        phone: normalizedPhone,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        contentName: destination,
+        contentCategory: serviceType,
+        value: numericPrice,
+        currency: "TND",
+      })
+
+      await sendServerCapiEvent({
+        eventName: "Purchase",
+        eventId: purchaseEventId,
+        email: data.email,
+        phone: normalizedPhone,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        contentName: destination,
+        contentCategory: serviceType,
+        value: numericPrice,
+        currency: "TND",
       })
 
       setWhatsappLink(result.whatsappLink)
@@ -119,7 +183,7 @@ export function LeadForm({ serviceType, destination, calculatedPrice, aiSummary,
   return (
     <Card className="animate-in slide-in-from-bottom-4">
       <CardHeader>
-        <CardTitle className="text-lg">{t("lead.title")}</CardTitle>
+        <CardTitle className="text-lg">Confirmer et bloquer votre tarif</CardTitle>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -165,7 +229,7 @@ export function LeadForm({ serviceType, destination, calculatedPrice, aiSummary,
               Annuler
             </Button>
             <Button type="submit" disabled={isSubmitting} className="flex-1">
-              {isSubmitting ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : t("lead.submit")}
+              {isSubmitting ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : "Confirmer et Bloquer mon Tarif"}
             </Button>
           </div>
         </form>

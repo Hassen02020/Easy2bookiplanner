@@ -34,6 +34,14 @@ interface SelectedBooking {
   destination: string
   calculatedPrice: string
   aiSummary: string
+  remainingSlots: number | null
+}
+
+interface PaywallState {
+  triggerPaywall: boolean
+  messageCount: number
+  maxFreeMessages: number
+  remaining: number
 }
 
 interface ChatInterfaceProps {
@@ -79,6 +87,7 @@ export function ChatInterface({ className }: ChatInterfaceProps) {
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [selectedBooking, setSelectedBooking] = useState<SelectedBooking | null>(null)
+  const [paywall, setPaywall] = useState<PaywallState | null>(null)
   const [detectedLang, setDetectedLang] = useState<SupportedLanguage>(
     (i18n.language as SupportedLanguage) || "fr"
   )
@@ -137,6 +146,18 @@ export function ChatInterface({ className }: ChatInterfaceProps) {
         }
 
         const data = await response.json()
+
+        if (data.triggerPaywall) {
+          setPaywall({
+            triggerPaywall: true,
+            messageCount: data.session?.messageCount || 0,
+            maxFreeMessages: data.session?.maxFreeMessages || 3,
+            remaining: 0,
+          })
+        } else {
+          setPaywall(null)
+        }
+
         const assistantMessage: ChatMessage = {
           id: `msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
           role: "assistant",
@@ -242,6 +263,7 @@ export function ChatInterface({ className }: ChatInterfaceProps) {
                               calculatedPrice:
                                 result.price?.replace(/[^\d.,]/g, "").split(" ")[0] || "0.00",
                               aiSummary: message.content.slice(0, 120),
+                              remainingSlots: result.availableSeats ?? null,
                             })
                           }
                         >
@@ -260,6 +282,7 @@ export function ChatInterface({ className }: ChatInterfaceProps) {
                     destination={selectedBooking.destination}
                     calculatedPrice={selectedBooking.calculatedPrice}
                     aiSummary={selectedBooking.aiSummary}
+                    remainingSlots={selectedBooking.remainingSlots}
                     onClose={() => setSelectedBooking(null)}
                   />
                 </div>
@@ -275,6 +298,18 @@ export function ChatInterface({ className }: ChatInterfaceProps) {
               </div>
             </div>
           )}
+
+          {paywall?.triggerPaywall && (
+            <div className="rounded-xl border border-amber-500 bg-amber-50 p-4 text-sm text-amber-900">
+              <p className="font-semibold">Limite de messages gratuits atteinte</p>
+              <p className="mt-1">
+                Vous avez utilisé {paywall.messageCount}/{paywall.maxFreeMessages} messages.
+                Pour débloquer votre plan complet, accéder aux guides locaux et valider votre tarif optimisé,
+                cliquez sur <strong>Confirmer ma réservation</strong> ci-dessous.
+              </p>
+            </div>
+          )}
+
           <div ref={scrollRef} />
         </div>
       </main>
@@ -293,6 +328,7 @@ export function ChatInterface({ className }: ChatInterfaceProps) {
               ref={inputRef}
               type="text"
               value={input}
+              disabled={paywall?.triggerPaywall}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
@@ -300,7 +336,7 @@ export function ChatInterface({ className }: ChatInterfaceProps) {
                   handleSend()
                 }
               }}
-              placeholder={t("chat.placeholder")}
+              placeholder={paywall?.triggerPaywall ? "Débloquez l'accès complet pour continuer" : t("chat.placeholder")}
               aria-label="Message"
               className="h-12 rounded-full px-4"
             />

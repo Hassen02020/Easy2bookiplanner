@@ -5,6 +5,7 @@ import { chatRequestSchema, searchHotelsSchema, searchTripsSchema } from "@/lib/
 import { searchHotels, searchTrips } from "@/lib/db/search"
 import { formatIndicativePrice } from "@/lib/pricing"
 import { getTelemetryData } from "@/lib/telemetry"
+import { getSessionUsage, incrementSessionUsage } from "@/lib/services/sessionLimiter"
 
 async function getOpenAI() {
   const { default: OpenAI } = await import("openai")
@@ -15,6 +16,23 @@ export async function POST(request: NextRequest) {
   try {
     const body = chatRequestSchema.parse(await request.json())
     const { messages, lang } = body
+
+    const sessionUsage = await getSessionUsage()
+    if (sessionUsage.triggerPaywall) {
+      return NextResponse.json({
+        content: "Vous avez atteint votre limite de 3 messages gratuits. Débloquez l'accès complet pour continuer avec un conseiller Easy2Book.",
+        lang,
+        triggerPaywall: true,
+        session: {
+          messageCount: sessionUsage.messageCount,
+          maxFreeMessages: sessionUsage.maxFreeMessages,
+          remaining: 0,
+        },
+        telemetry: await getTelemetryData(),
+      })
+    }
+
+    await incrementSessionUsage()
 
     const telemetry = await getTelemetryData()
     const systemPrompt = buildSystemPrompt(lang)

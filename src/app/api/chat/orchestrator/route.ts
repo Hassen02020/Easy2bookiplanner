@@ -16,6 +16,7 @@ import {
   generateLowBudgetItinerary,
   getHeritageBudgetActivities,
 } from "@/utils/lowBudgetOptimizer"
+import { getSessionUsage, incrementSessionUsage } from "@/lib/services/sessionLimiter"
 import { db } from "@/db"
 import { packageInventory, aiMarketTrends, clientTrips } from "@/db/schema"
 import { eq, and, sql } from "drizzle-orm"
@@ -116,6 +117,12 @@ interface OrchestratorResponse {
     paidActivities: string[]
     tips: string[]
   }
+  session: {
+    messageCount: number
+    maxFreeMessages: number
+    remaining: number
+    triggerPaywall: boolean
+  }
   flags: {
     showBookingForm: boolean
     showUrgency: boolean
@@ -128,6 +135,8 @@ interface OrchestratorResponse {
     explorerMode: boolean
     visaFree: boolean
     lowBudget: boolean
+    triggerPaywall: boolean
+    showLeadForm: boolean
   }
 }
 
@@ -606,7 +615,13 @@ Dès qu'une demande d'itinéraire est détectée, tu DOIS structurer la réponse
 3. **Après-midi** : exploration à pied, immersion, shopping de créateurs locaux ou micro-aventure.
 4. **Soir** : expérience nocturne marquante (rooftop secret, coucher de soleil panoramique, spot insolite).
 
-Chaque journée doit être typique, rythmée et respectueuse du "slow travel".
+## RÈGLE DE MONÉTISATION : PAYWALL SÉMANTIQUE
+Si l'utilisateur demande un plan de voyage complet, tu DOIS générer de manière visible et détaillée uniquement le **Jour 1 et le Jour 2**.
+À partir du **Jour 3**, tronque la réponse et injecte EXACTEMENT ce texte de conversion dans le champ "morning" de chaque jour :
+"[🔒 CONTENU PREMIUM VERROUILLÉ] Pour débloquer la suite de votre itinéraire exclusif jour par jour, obtenir les coordonnées de la maison d'hôte, du guide local, et bloquer votre tarif préférentiel en TND, veuillez finaliser votre demande ci-dessous pour recevoir votre lien de paiement d'acompte."
+
+Les autres champs des jours 3+ (midday, afternoon, evening, estimatedCost) doivent être vides ou null.
+L'API retournera en parallèle le drapeau structuré showLeadForm: true.
 `
 
   const outputFormat = `
@@ -680,6 +695,43 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const body = requestSchema.parse(await request.json())
     const { message, lang, sessionId, userPhone, tripType: requestedTripType, groupSize: requestedGroupSize, previousMessages } = body
+
+    // Vérification du quota de messages gratuits
+    const sessionUsage = await getSessionUsage()
+    if (sessionUsage.triggerPaywall) {
+      return NextResponse.json({
+        message: "Vous avez atteint votre limite de messages gratuits. Débloquez l'accès complet à Easy2Book pour continuer.",
+        itinerary: null,
+        suggestedPackage: null,
+        clientTripId: null,
+        family: null,
+        budgetMatches: null,
+        lowBudget: { active: false, accommodations: [], freeActivities: [], paidActivities: [], tips: [] },
+        session: {
+          messageCount: sessionUsage.messageCount,
+          maxFreeMessages: sessionUsage.maxFreeMessages,
+          remaining: 0,
+          triggerPaywall: true,
+        },
+        flags: {
+          showBookingForm: false,
+          showUrgency: false,
+          isSoldOut: false,
+          currentPrice: 0,
+          currency: "TND",
+          remainingSlots: 0,
+          category: "generic",
+          destination: null,
+          explorerMode: false,
+          visaFree: false,
+          lowBudget: false,
+          triggerPaywall: true,
+          showLeadForm: true,
+        },
+      })
+    }
+
+    await incrementSessionUsage()
 
     const intent = detectIntent(message, lang)
     const { category, destination, explorerMode, durationDays } = intent
@@ -779,6 +831,12 @@ ${passMember ? "Client membre PASS : bypass des marges sur hôtels locaux et tou
         paidActivities: [],
         tips: [],
       },
+      session: {
+        messageCount: sessionUsage.messageCount + 1,
+        maxFreeMessages: sessionUsage.maxFreeMessages,
+        remaining: Math.max(0, sessionUsage.maxFreeMessages - (sessionUsage.messageCount + 1)),
+        triggerPaywall: false,
+      },
       flags: {
         showBookingForm: false,
         showUrgency: false,
@@ -791,6 +849,8 @@ ${passMember ? "Client membre PASS : bypass des marges sur hôtels locaux et tou
         explorerMode,
         visaFree: intent.visaFree,
         lowBudget: intent.lowBudget,
+        triggerPaywall: false,
+        showLeadForm: true,
       },
     }
 
@@ -927,6 +987,8 @@ ${passMember ? "Client membre PASS : bypass des marges sur hôtels locaux et tou
       explorerMode,
       visaFree: intent.visaFree,
       lowBudget: intent.lowBudget,
+      triggerPaywall: false,
+      showLeadForm: true,
     }
 
     return NextResponse.json(parsed)

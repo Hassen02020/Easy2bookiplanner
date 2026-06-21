@@ -6,7 +6,7 @@ import { db } from "@/db"
 import { users, leadRequests } from "@/db/schema"
 import { eq } from "drizzle-orm"
 import { normalizePhone, isValidTunisianPhone } from "@/lib/phone"
-import { buildWhatsAppManifest, buildWhatsAppLink } from "@/lib/whatsapp"
+import { buildWhatsAppManifest, buildWhatsAppLink } from "@/utils/whatsappManifest"
 import { getTelemetryData } from "@/lib/telemetry"
 
 const leadSchema = z.object({
@@ -21,6 +21,7 @@ const leadSchema = z.object({
   period: z.string().optional().default("Non précisée"),
   participants: z.string().optional().default("Non précisé"),
   calculatedPrice: z.string().optional().default("0.00"),
+  remainingSlots: z.number().optional().nullable(),
   aiSummary: z.string().optional().default("Lead intéressé par une offre Easy2Book"),
 })
 
@@ -99,6 +100,7 @@ export async function submitLead(input: LeadInput) {
     period: validated.period,
     participants: validated.participants,
     calculatedPrice: validated.calculatedPrice,
+    remainingSlots: validated.remainingSlots,
     detectedCity: telemetry.city,
     detectedRegion: telemetry.region,
     aiSummary: validated.aiSummary,
