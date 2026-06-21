@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { calculateDisplayPrice } from "@/lib/pricing"
 import { checkAvailability } from "@/db/inventory"
+import {
+  detectVisaFreeIntent,
+  getQuickEscapeDestinations,
+  formatVisaLabel,
+} from "@/lib/services/destinationFilters"
+import { parseFamilyStructure, allocateRooms, containsFamilyStructure } from "@/utils/familyParser"
+import { findPackagesWithinBudget } from "@/utils/budgetMatcher"
 import { db } from "@/db"
 import { packageInventory, aiMarketTrends, clientTrips } from "@/db/schema"
 import { eq, and, sql } from "drizzle-orm"
@@ -41,6 +48,12 @@ interface TravelIntent {
   language: SupportedLanguage
   explorerMode: boolean
   durationDays: number | null
+  visaFree: boolean
+  family: {
+    adults: number
+    children: number
+    ages: number[]
+  } | null
 }
 
 interface ItineraryDay {
@@ -65,6 +78,26 @@ interface OrchestratorResponse {
   itinerary: ItineraryPlan | null
   suggestedPackage: string | null
   clientTripId: string | null
+  family: {
+    adults: number
+    children: number
+    ages: number[]
+    rooms: Array<{
+      type: string
+      capacity: number
+      count: number
+      label: string
+    }>
+  } | null
+  budgetMatches: Array<{
+    id: string
+    type: string
+    name: string
+    destination: string
+    finalPrice: number
+    savings: number
+    details: string
+  }> | null
   flags: {
     showBookingForm: boolean
     showUrgency: boolean
@@ -75,6 +108,7 @@ interface OrchestratorResponse {
     category: TravelCategory
     destination: string | null
     explorerMode: boolean
+    visaFree: boolean
   }
 }
 
@@ -276,11 +310,27 @@ function detectDestination(text: string): { destination: string | null; category
   return { destination: null, category: "generic" }
 }
 
+function detectBudget(text: string): number | null {
+  const match = /(\d{3,})\s*(tnd|dt|dinars?|€|\$|eur)/i.exec(text)
+  if (match) return parseInt(match[1], 10)
+  return null
+}
+
 function detectIntent(text: string, preferredLang: SupportedLanguage): TravelIntent {
   const language = detectLanguage(text, preferredLang)
   const { destination, category } = detectDestination(text)
   const explorerMode = detectExplorerMode(text)
   const durationDays = detectDurationDays(text)
+  const visaFree = detectVisaFreeIntent(text)
+
+  const familyStructure = containsFamilyStructure(text) ? parseFamilyStructure(text) : null
+  const family = familyStructure
+    ? {
+        adults: familyStructure.adults,
+        children: familyStructure.children.length,
+        ages: familyStructure.children.map((c) => c.age),
+      }
+    : null
 
   // Si mode explorateur détecté mais catégorie générique, on bascule vers explorer
   const finalCategory: TravelCategory =
@@ -292,6 +342,8 @@ function detectIntent(text: string, preferredLang: SupportedLanguage): TravelInt
     language,
     explorerMode,
     durationDays,
+    visaFree,
+    family,
   }
 }
 
@@ -431,6 +483,18 @@ Tu dois répondre en JSON strictement valide avec cette structure :
 La propriété "message" doit être un texte fluide en français premium (ou Derja si approprié). Les clés de l'itinéraire sont en anglais pour le frontend. Ne mets pas de markdown à l'intérieur du JSON.
 `
 
+  const visaLine = intent.destination
+    ? `Statut visa pour passeport tunisien : ${formatVisaLabel(intent.destination)}.`
+    : ""
+  const visaFreeLine = intent.visaFree
+    ? `Mode "Évasion sans visa" activé. Privilégie impérativement les destinations sans visa ou visa à l'arrivée : ${getQuickEscapeDestinations()
+        .map((d) => d.destination)
+        .join(", ")}.`
+    : ""
+  const familyLine = intent.family
+    ? `Structure familiale : ${intent.family.adults} adulte(s), ${intent.family.children} enfant(s).`
+    : ""
+
   return `${antiAgency}
 ${alternativeKb}
 ${dayByDayRules}
@@ -439,6 +503,9 @@ ${outputFormat}
 ## CONTEXTE COURANT
 Catégorie détectée : ${intent.category}. Destination : ${intent.destination || "non précisée"}. Mode Explorateur : ${intent.explorerMode ? "activé" : "désactivé"}. Langue : ${lang}. ${context}
 
+${visaLine}
+${visaFreeLine}
+${familyLine}
 ${priceLine}
 ${urgency}
 `
@@ -522,6 +589,8 @@ Historique : ${previousMessages.length > 0 ? " conversation en cours" : " premi�
       itinerary: null,
       suggestedPackage: null,
       clientTripId: null,
+      family: null,
+      budgetMatches: null,
       flags: {
         showBookingForm: false,
         showUrgency: false,
@@ -532,6 +601,7 @@ Historique : ${previousMessages.length > 0 ? " conversation en cours" : " premi�
         category,
         destination,
         explorerMode,
+        visaFree: intent.visaFree,
       },
     }
 
@@ -601,6 +671,43 @@ Historique : ${previousMessages.length > 0 ? " conversation en cours" : " premi�
         console.error("[orchestrator] background persistence failed:", error)
       })
 
+    // Allocation familiale et budget matching
+    if (intent.family) {
+      const familyStructure = parseFamilyStructure(
+        `${intent.family.adults} adultes et ${intent.family.children} enfants de ${intent.family.ages.join(", ")} ans`
+      )
+      const allocation = allocateRooms(familyStructure)
+      parsed.family = {
+        adults: intent.family.adults,
+        children: intent.family.children,
+        ages: intent.family.ages,
+        rooms: allocation.rooms.map((r) => ({
+          type: r.type,
+          capacity: r.capacity,
+          count: r.count,
+          label: r.label,
+        })),
+      }
+    }
+
+    const maxBudget = detectBudget(message)
+    if (maxBudget) {
+      const matches = await findPackagesWithinBudget({
+        maxBudget,
+        category: category === "generic" ? undefined : category,
+        destination: destination || undefined,
+      })
+      parsed.budgetMatches = matches.map((m) => ({
+        id: m.id,
+        type: m.type,
+        name: m.name,
+        destination: m.destination,
+        finalPrice: m.finalPrice,
+        savings: m.savings,
+        details: m.details,
+      }))
+    }
+
     // Flags frontend
     const showBookingForm =
       availability.available && !availability.isSoldOut && !availability.notFound && !explorerMode
@@ -616,6 +723,7 @@ Historique : ${previousMessages.length > 0 ? " conversation en cours" : " premi�
       category,
       destination,
       explorerMode,
+      visaFree: intent.visaFree,
     }
 
     return NextResponse.json(parsed)
