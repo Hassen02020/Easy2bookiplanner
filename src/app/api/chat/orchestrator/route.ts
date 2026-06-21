@@ -35,6 +35,8 @@ const requestSchema = z.object({
   lang: z.enum(["fr", "en", "ar"]).optional().default("fr"),
   sessionId: z.string().min(1).optional().default("anonymous"),
   userPhone: z.string().optional(),
+  tripType: z.enum(["mice", "medical", "event", "leisure"]).optional().default("leisure"),
+  groupSize: z.number().int().min(1).optional().default(1),
   previousMessages: z
     .array(
       z.object({
@@ -388,6 +390,26 @@ function detectBudget(text: string): number | null {
   return null
 }
 
+function detectTripType(text: string): "mice" | "medical" | "event" | "leisure" {
+  const lower = text.toLowerCase()
+  if (/\b(seminaire|conference|mice|team building|corporate|entreprise|business|salon|colloque)\b/.test(lower)) {
+    return "mice"
+  }
+  if (/\b(chirurgie|operation|medical|dentaire|esthetique|tha|thalasso|traitement|hopital|clinique|convalescence)\b/.test(lower)) {
+    return "medical"
+  }
+  if (/\b(mariage|wedding|anniversaire|event|evenement|gala|fete)\b/.test(lower)) {
+    return "event"
+  }
+  return "leisure"
+}
+
+function detectGroupSize(text: string): number {
+  const match = /(\d{1,4})\s*(personnes?|participants?|invités?|voyageurs?|attendees?)/i.exec(text)
+  if (match) return Math.min(parseInt(match[1], 10), 500)
+  return 1
+}
+
 function detectIntent(text: string, preferredLang: SupportedLanguage): TravelIntent {
   const language = detectLanguage(text, preferredLang)
   const { destination, category } = detectDestination(text)
@@ -556,6 +578,26 @@ Conseils : minimise les hôtels internationaux, privilégie les maisons d'hôte,
 `
     : ""
 
+  const miceMedicalRules = `
+## INBOUND & MICE / MEDICAL TOURISM
+
+### MICE (Corporate & Events)
+- Planifie des plannings d'engagement rigides heure par heure.
+- Propose des salles de réunion, pauses café, transferts collectifs par bus privés, soirées de gala.
+- Mentionne toujours les volumes d'invités et les tarifs dégressifs de groupe (10-20 personnes : -5%, 20-50 : -10%, 50+ : -15%).
+- Adopte un ton professionnel, exécutif et rassurant.
+
+### Médical Tourism
+- Adopte un ton rassurant, professionnel et confidentiel.
+- Intègre des temps de repos post-opératoire obligatoires et des séjours de convalescence dans des hôtels partenaires spécialisés en thalassothérapie.
+- Ne donne jamais d'avis médical : oriente vers les cliniques partenaires et rappelle que le dossier est confidentiel.
+- Privilégie les hébergements calmes, proches des établissements de soins, avec accès thalasso.
+
+### Group Pricing
+- Si le groupe fait plus de 10 personnes, applique automatiquement une réduction de groupe dans le prix affiché.
+- Pour les MICE, proposer des packages clés en main : airport-to-airport, hôtel, salles, restauration, excursions.
+`
+
   const dayByDayRules = `
 ## ALGORITHME JOUR PAR JOUR (strict)
 Dès qu'une demande d'itinéraire est détectée, tu DOIS structurer la réponse en 4 moments par jour :
@@ -615,6 +657,7 @@ La propriété "message" doit être un texte fluide en français premium (ou Der
   return `${antiAgency}
 ${alternativeKb}
 ${lowBudgetPlan}
+${miceMedicalRules}
 ${dayByDayRules}
 ${outputFormat}
 
@@ -636,26 +679,32 @@ ${urgency}
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const body = requestSchema.parse(await request.json())
-    const { message, lang, sessionId, userPhone, previousMessages } = body
+    const { message, lang, sessionId, userPhone, tripType: requestedTripType, groupSize: requestedGroupSize, previousMessages } = body
 
     const intent = detectIntent(message, lang)
     const { category, destination, explorerMode, durationDays } = intent
 
+    // Type de voyage (MICE, Médical, Événement, Loisir) et taille du groupe
+    const tripType = requestedTripType || detectTripType(message)
+    const groupSize = requestedGroupSize || detectGroupSize(message)
+
     // Membre Pass : bypass des marges sur hôtels locaux et tourisme alternatif
     const passMember = userPhone ? await isPassMember(userPhone) : false
 
-    // Prix réel après marges dynamiques
+    // Prix réel après marges dynamiques et tarifs de groupe
     const rawPrice = estimateRawPrice(category, destination)
     const serviceType: "hotel" | "flight" | "trip" = category === "hotel" ? "hotel" : "trip"
     const pricingCategory = category === "generic" ? "generic" : category
+    const groupDiscountMultiplier = groupSize >= 50 ? 0.85 : groupSize >= 20 ? 0.9 : groupSize >= 10 ? 0.95 : 1
 
-    const finalPrice = await calculateDisplayPrice(
+    const enginePrice = await calculateDisplayPrice(
       serviceType,
       rawPrice,
       destination,
       pricingCategory,
       passMember
     )
+    const finalPrice = Math.round(enginePrice * groupDiscountMultiplier * 100) / 100
 
     // Disponibilité des stocks
     const packageId = await findInventoryPackage(category, destination)
@@ -676,6 +725,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Contexte additionnel
     const context = `
 Nombre de jours demandé : ${durationDays || "non précisé"}.
+Type de voyage : ${tripType}. Taille du groupe : ${groupSize} personne(s).
 Historique : ${previousMessages.length > 0 ? " conversation en cours" : " première interaction"}.
 Guides locaux disponibles : ${
       localGuides.length > 0

@@ -6,16 +6,32 @@
  * Composant d'affichage du Live Trip-Book personnalisé Easy2Book.
  * - Mobile-first avec h-dvh.
  * - Itinéraire jour par jour structuré (Matin, Midi, Après-midi, Soir).
+ * - International : logistique aéroport, PIN chauffeur, timeline MICE/médical.
  * - Boutons d'action rapide fixes en bas : guide, chat, acompte.
  */
 
 import Link from "next/link"
-import { useState } from "react"
-import { MapPin, MessageCircle, User, CreditCard, ChevronDown, ChevronUp, Star, ArrowLeft } from "lucide-react"
+import { useState, useEffect } from "react"
+import {
+  MapPin,
+  MessageCircle,
+  User,
+  CreditCard,
+  ChevronDown,
+  ChevronUp,
+  Star,
+  ArrowLeft,
+  Plane,
+  Shield,
+  Phone,
+  Calendar,
+  Globe,
+} from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { AirportManifest } from "@/utils/airportConcierge"
 
 interface ItineraryDay {
   day: number
@@ -32,6 +48,7 @@ interface ItineraryPlan {
   days: ItineraryDay[]
   totalEstimatedCost?: string
   valueForMoneyScore?: number
+  timeline?: Array<{ time: string; label: string; type: string }>
 }
 
 interface TripBookProps {
@@ -44,7 +61,46 @@ interface TripBookProps {
   totalEstimatedCost?: string | null
   valueForMoneyScore?: number | null
   itinerary: unknown
+  inboundManifest?: AirportManifest | null
+  tripType?: "mice" | "medical" | "event" | "leisure"
 }
+
+const TRANSLATIONS = {
+  fr: {
+    price: "Prix indicatif",
+    logistics: "Ma Logistique",
+    flight: "Vol",
+    arrival: "Arrivée",
+    departure: "Départ",
+    airport: "Aéroport",
+    pickup: "Point de prise en charge",
+    driverPin: "PIN chauffeur",
+    assistance: "Appeler mon assistance",
+    timeline: "Mon programme",
+    guide: "Guide",
+    modify: "Modifier",
+    deposit: "Acompte",
+    noItinerary: "Aucun itinéraire détaillé disponible pour ce voyage.",
+  },
+  en: {
+    price: "Indicative price",
+    logistics: "My Logistics",
+    flight: "Flight",
+    arrival: "Arrival",
+    departure: "Departure",
+    airport: "Airport",
+    pickup: "Pickup location",
+    driverPin: "Driver PIN",
+    assistance: "Call my assistance",
+    timeline: "My schedule",
+    guide: "Guide",
+    modify: "Modify",
+    deposit: "Deposit",
+    noItinerary: "No detailed itinerary available for this trip.",
+  },
+}
+
+type Language = "fr" | "en"
 
 export function TripBook({
   id,
@@ -56,11 +112,24 @@ export function TripBook({
   totalEstimatedCost,
   valueForMoneyScore,
   itinerary,
+  inboundManifest,
+  tripType = "leisure",
 }: TripBookProps) {
   const [openDays, setOpenDays] = useState<number[]>([1])
+  const [language, setLanguage] = useState<Language>("fr")
+
+  useEffect(() => {
+    const browserLang = navigator.language?.slice(0, 2)
+    if (browserLang === "en") setLanguage("en")
+    if (inboundManifest?.language === "fr") setLanguage("fr")
+    if (inboundManifest?.language === "en") setLanguage("en")
+  }, [inboundManifest?.language])
+
+  const t = TRANSLATIONS[language]
 
   const plan = itinerary as ItineraryPlan | null
   const days = plan?.days || []
+  const timeline = plan?.timeline || []
 
   const toggleDay = (day: number) => {
     setOpenDays((prev) => (prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]))
@@ -68,14 +137,22 @@ export function TripBook({
 
   const whatsappNumber = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER?.replace(/\D/g, "") || "21600000000"
   const guideMessage = encodeURIComponent(
-    `Bonjour, je consulte mon Trip-Book #${id} pour ${destination}. Pouvez-vous me mettre en relation avec mon guide local ?`
+    language === "fr"
+      ? `Bonjour, je consulte mon Trip-Book #${id} pour ${destination}. Pouvez-vous me mettre en relation avec mon guide local ?`
+      : `Hello, I am viewing my Trip-Book #${id} for ${destination}. Can you connect me with my local guide?`
   )
   const modifyMessage = encodeURIComponent(
-    `Bonjour, je souhaite modifier l'itinéraire de mon Trip-Book #${id} pour ${destination}.`
+    language === "fr"
+      ? `Bonjour, je souhaite modifier l'itinéraire de mon Trip-Book #${id} pour ${destination}.`
+      : `Hello, I would like to modify my Trip-Book #${id} for ${destination}.`
   )
   const depositMessage = encodeURIComponent(
-    `Bonjour, je suis prêt à payer l'acompte pour mon Trip-Book #${id} (${destination}).`
+    language === "fr"
+      ? `Bonjour, je suis prêt à payer l'acompte pour mon Trip-Book #${id} (${destination}).`
+      : `Hello, I am ready to pay the deposit for my Trip-Book #${id} (${destination}).`
   )
+
+  const isInternational = tripType !== "leisure"
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-background">
@@ -92,6 +169,13 @@ export function TripBook({
             <h1 className="text-base font-semibold leading-tight">{title}</h1>
             {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
           </div>
+          <button
+            onClick={() => setLanguage(language === "fr" ? "en" : "fr")}
+            className="flex h-8 items-center gap-1 rounded-full bg-muted px-2 text-xs font-medium"
+          >
+            <Globe className="h-3.5 w-3.5" />
+            {language.toUpperCase()}
+          </button>
         </div>
       </header>
 
@@ -103,11 +187,16 @@ export function TripBook({
           <Badge variant="secondary" className="ml-2 text-xs">
             {category}
           </Badge>
+          {isInternational && (
+            <Badge variant="outline" className="text-xs uppercase">
+              {tripType}
+            </Badge>
+          )}
         </div>
 
         <div className="mt-3 flex items-end justify-between">
           <div>
-            <div className="text-xs text-muted-foreground">Prix indicatif</div>
+            <div className="text-xs text-muted-foreground">{t.price}</div>
             <div className="text-2xl font-bold text-primary">
               {calculatedPrice ? `${calculatedPrice} TND` : totalEstimatedCost || "Sur devis"}
             </div>
@@ -122,10 +211,90 @@ export function TripBook({
       </section>
 
       {/* Itinerary scrollable */}
-      <main className="flex-1 overflow-y-auto overscroll-y-contain p-4">
+      <main className="flex-1 overflow-y-auto overscroll-y-contain p-4 space-y-4">
+        {/* International logistics */}
+        {isInternational && inboundManifest && (
+          <Card className="border-l-4 border-l-primary">
+            <CardContent className="p-4">
+              <div className="mb-3 flex items-center gap-2">
+                <Plane className="h-4 w-4 text-primary" />
+                <h3 className="text-sm font-semibold">{t.logistics}</h3>
+              </div>
+
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">{t.flight}</span>
+                  <span className="font-medium">{inboundManifest.flightNumber || "N/A"}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">{t.arrival}</span>
+                  <span className="font-medium">
+                    {inboundManifest.arrivalTime
+                      ? new Date(inboundManifest.arrivalTime).toLocaleString(language)
+                      : "N/A"}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">{t.departure}</span>
+                  <span className="font-medium">
+                    {inboundManifest.departureTime
+                      ? new Date(inboundManifest.departureTime).toLocaleString(language)
+                      : "N/A"}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">{t.airport}</span>
+                  <span className="font-medium">{inboundManifest.airportCode || "N/A"}</span>
+                </div>
+                <div className="pt-2 text-xs text-muted-foreground">
+                  {t.pickup}: {inboundManifest.terminalPickup}
+                </div>
+                <div className="flex items-center gap-2 rounded-lg bg-muted p-2">
+                  <Shield className="h-4 w-4 text-primary" />
+                  <span className="text-xs font-medium">
+                    {t.driverPin}: {inboundManifest.securityPin}
+                  </span>
+                </div>
+              </div>
+
+              <Button className="mt-3 w-full" size="sm" asChild>
+                <a href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(language === "fr" ? "Assistance locale" : "Local assistance")}`} target="_blank" rel="noreferrer">
+                  <Phone className="mr-2 h-4 w-4" />
+                  {t.assistance}
+                </a>
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Timeline for MICE / medical */}
+        {isInternational && timeline.length > 0 && (
+          <Card>
+            <CardContent className="p-4">
+              <div className="mb-3 flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-primary" />
+                <h3 className="text-sm font-semibold">{t.timeline}</h3>
+              </div>
+              <div className="relative space-y-4 pl-4">
+                {timeline.map((item, index) => (
+                  <div key={index} className="relative">
+                    <div className="absolute -left-4 top-1 h-2 w-2 rounded-full bg-primary" />
+                    {index !== timeline.length - 1 && (
+                      <div className="absolute -left-[13px] top-3 h-full w-px bg-border" />
+                    )}
+                    <div className="text-xs font-medium text-muted-foreground">{item.time}</div>
+                    <div className="text-sm font-medium">{item.label}</div>
+                    <div className="text-xs text-muted-foreground capitalize">{item.type}</div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {days.length === 0 ? (
           <div className="text-center text-sm text-muted-foreground">
-            Aucun itinéraire détaillé disponible pour ce voyage.
+            {t.noItinerary}
           </div>
         ) : (
           <div className="space-y-3">
@@ -167,19 +336,19 @@ export function TripBook({
           <Button variant="outline" size="sm" className="flex-col gap-1 h-auto py-2" asChild>
             <a href={`https://wa.me/${whatsappNumber}?text=${guideMessage}`} target="_blank" rel="noreferrer">
               <User className="h-4 w-4" />
-              <span className="text-xs">Guide</span>
+              <span className="text-xs">{t.guide}</span>
             </a>
           </Button>
           <Button variant="outline" size="sm" className="flex-col gap-1 h-auto py-2" asChild>
             <a href={`https://wa.me/${whatsappNumber}?text=${modifyMessage}`} target="_blank" rel="noreferrer">
               <MessageCircle className="h-4 w-4" />
-              <span className="text-xs">Modifier</span>
+              <span className="text-xs">{t.modify}</span>
             </a>
           </Button>
           <Button size="sm" className="flex-col gap-1 h-auto py-2" asChild>
             <a href={`https://wa.me/${whatsappNumber}?text=${depositMessage}`} target="_blank" rel="noreferrer">
               <CreditCard className="h-4 w-4" />
-              <span className="text-xs">Acompte</span>
+              <span className="text-xs">{t.deposit}</span>
             </a>
           </Button>
         </div>

@@ -1,7 +1,10 @@
+CREATE TYPE "public"."airport_code" AS ENUM('TUN', 'NBE', 'MIR');--> statement-breakpoint
+CREATE TYPE "public"."event_type" AS ENUM('seminar', 'wedding', 'conference');--> statement-breakpoint
 CREATE TYPE "public"."language" AS ENUM('fr', 'ar', 'en');--> statement-breakpoint
 CREATE TYPE "public"."lead_status" AS ENUM('pending', 'converted_lead', 'redirected_whatsapp');--> statement-breakpoint
 CREATE TYPE "public"."rule_type" AS ENUM('markup_percentage', 'discount_fixed', 'override');--> statement-breakpoint
 CREATE TYPE "public"."service_type" AS ENUM('hotel', 'flight', 'trip');--> statement-breakpoint
+CREATE TYPE "public"."trip_type" AS ENUM('mice', 'medical', 'event', 'leisure');--> statement-breakpoint
 CREATE TABLE IF NOT EXISTS "ai_market_trends" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"session_id" varchar(255) NOT NULL,
@@ -26,6 +29,20 @@ CREATE TABLE IF NOT EXISTS "client_trips" (
 	"value_for_money_score" integer,
 	"calculated_price" numeric(10, 2),
 	"status" varchar(50) DEFAULT 'draft' NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE IF NOT EXISTS "corporate_events" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"company_name" varchar(255) NOT NULL,
+	"event_type" "event_type" NOT NULL,
+	"total_attendees" integer NOT NULL,
+	"allocated_budget" numeric(12, 2),
+	"start_date" timestamp with time zone,
+	"end_date" timestamp with time zone,
+	"contact_email" varchar(255),
+	"contact_phone" varchar(50),
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
@@ -57,6 +74,23 @@ CREATE TABLE IF NOT EXISTS "hotels" (
 	"destination" varchar(255) NOT NULL,
 	"is_active" boolean DEFAULT true NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE IF NOT EXISTS "inbound_trips" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"client_trip_id" uuid,
+	"user_passport_name" varchar(255) NOT NULL,
+	"country_origin" varchar(100),
+	"flight_number" varchar(50),
+	"arrival_time" timestamp with time zone,
+	"departure_time" timestamp with time zone,
+	"airport_code" "airport_code",
+	"assigned_driver_id" varchar(255),
+	"security_pin" varchar(10) NOT NULL,
+	"trip_type" "trip_type" DEFAULT 'leisure' NOT NULL,
+	"language" varchar(20) DEFAULT 'en' NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE IF NOT EXISTS "lead_requests" (
@@ -146,6 +180,12 @@ EXCEPTION
 END $$;
 --> statement-breakpoint
 DO $$ BEGIN
+ ALTER TABLE "inbound_trips" ADD CONSTRAINT "inbound_trips_client_trip_id_client_trips_id_fk" FOREIGN KEY ("client_trip_id") REFERENCES "public"."client_trips"("id") ON DELETE no action ON UPDATE no action;
+EXCEPTION
+ WHEN duplicate_object THEN null;
+END $$;
+--> statement-breakpoint
+DO $$ BEGIN
  ALTER TABLE "lead_requests" ADD CONSTRAINT "lead_requests_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;
 EXCEPTION
  WHEN duplicate_object THEN null;
@@ -164,11 +204,17 @@ CREATE INDEX IF NOT EXISTS "ai_market_trends_created_at_idx" ON "ai_market_trend
 CREATE INDEX IF NOT EXISTS "client_trips_session_idx" ON "client_trips" USING btree ("session_id");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "client_trips_destination_idx" ON "client_trips" USING btree ("destination");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "client_trips_status_idx" ON "client_trips" USING btree ("status");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "corporate_events_company_idx" ON "corporate_events" USING btree ("company_name");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "corporate_events_type_idx" ON "corporate_events" USING btree ("event_type");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "corporate_events_dates_idx" ON "corporate_events" USING btree ("start_date","end_date");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "flights_departure_idx" ON "flights" USING btree ("departure_airport");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "flights_arrival_idx" ON "flights" USING btree ("arrival_airport");--> statement-breakpoint
 CREATE UNIQUE INDEX IF NOT EXISTS "hotel_translations_hotel_lang_unique_idx" ON "hotel_translations" USING btree ("hotel_id","language");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "hotels_destination_idx" ON "hotels" USING btree ("destination");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "hotels_active_idx" ON "hotels" USING btree ("is_active");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "inbound_trips_client_trip_idx" ON "inbound_trips" USING btree ("client_trip_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "inbound_trips_type_idx" ON "inbound_trips" USING btree ("trip_type");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "inbound_trips_arrival_idx" ON "inbound_trips" USING btree ("arrival_time");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "lead_requests_session_idx" ON "lead_requests" USING btree ("session_token");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "lead_requests_user_idx" ON "lead_requests" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "lead_requests_status_idx" ON "lead_requests" USING btree ("status");--> statement-breakpoint

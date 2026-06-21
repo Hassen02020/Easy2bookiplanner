@@ -1,8 +1,9 @@
 import { notFound } from "next/navigation"
 import { db } from "@/db"
-import { clientTrips } from "@/db/schema"
+import { clientTrips, inboundTrips } from "@/db/schema"
 import { eq } from "drizzle-orm"
 import { TripBook } from "@/components/trip-book"
+import { generateAirportManifest } from "@/utils/airportConcierge"
 
 /**
  * Trip Live Page
@@ -10,6 +11,8 @@ import { TripBook } from "@/components/trip-book"
  * Affiche le "Live Trip-Book" personnalisé d'un client.
  * Server Component Next.js 15 qui récupère l'itinéraire généré
  * et le rend avec une mise en page ultra-premium mobile-first.
+ * Pour les voyages internationaux (MICE, médical, événement), injecte
+ * les données logistiques airport-to-airport.
  */
 
 interface TripPageProps {
@@ -31,6 +34,14 @@ export default async function TripPage({ params }: TripPageProps) {
 
   const trip = rows[0]
 
+  const inboundRows = await db
+    .select()
+    .from(inboundTrips)
+    .where(eq(inboundTrips.clientTripId, id))
+    .limit(1)
+
+  const manifest = inboundRows.length > 0 ? await generateAirportManifest(id) : null
+
   return (
     <TripBook
       id={trip.id}
@@ -42,6 +53,8 @@ export default async function TripPage({ params }: TripPageProps) {
       totalEstimatedCost={trip.totalEstimatedCost}
       valueForMoneyScore={trip.valueForMoneyScore}
       itinerary={trip.itinerary}
+      inboundManifest={manifest}
+      tripType={inboundRows[0]?.tripType || "leisure"}
     />
   )
 }

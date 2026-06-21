@@ -260,3 +260,56 @@ export const userWallets = pgTable(
     statusIdx: index("user_wallets_status_idx").on(table.membershipStatus),
   })
 )
+
+export const tripTypeEnum = pgEnum("trip_type", ["mice", "medical", "event", "leisure"])
+
+export const airportCodeEnum = pgEnum("airport_code", ["TUN", "NBE", "MIR"])
+
+export const inboundTrips = pgTable(
+  "inbound_trips",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    clientTripId: uuid("client_trip_id").references(() => clientTrips.id),
+    userPassportName: varchar("user_passport_name", { length: 255 }).notNull(),
+    countryOrigin: varchar("country_origin", { length: 100 }),
+    flightNumber: varchar("flight_number", { length: 50 }),
+    arrivalTime: timestamp("arrival_time", { withTimezone: true }),
+    departureTime: timestamp("departure_time", { withTimezone: true }),
+    airportCode: airportCodeEnum("airport_code"),
+    assignedDriverId: varchar("assigned_driver_id", { length: 255 }),
+    securityPin: varchar("security_pin", { length: 10 }).notNull(),
+    tripType: tripTypeEnum("trip_type").default("leisure").notNull(),
+    language: varchar("language", { length: 20 }).default("en").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().$onUpdate(() => new Date()).notNull(),
+  },
+  (table) => ({
+    clientTripIdx: index("inbound_trips_client_trip_idx").on(table.clientTripId),
+    tripTypeIdx: index("inbound_trips_type_idx").on(table.tripType),
+    arrivalIdx: index("inbound_trips_arrival_idx").on(table.arrivalTime),
+  })
+)
+
+export const eventTypeEnum = pgEnum("event_type", ["seminar", "wedding", "conference"])
+
+export const corporateEvents = pgTable(
+  "corporate_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    companyName: varchar("company_name", { length: 255 }).notNull(),
+    eventType: eventTypeEnum("event_type").notNull(),
+    totalAttendees: integer("total_attendees").notNull(),
+    allocatedBudget: numeric("allocated_budget", { precision: 12, scale: 2 }),
+    startDate: timestamp("start_date", { withTimezone: true }),
+    endDate: timestamp("end_date", { withTimezone: true }),
+    contactEmail: varchar("contact_email", { length: 255 }),
+    contactPhone: varchar("contact_phone", { length: 50 }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().$onUpdate(() => new Date()).notNull(),
+  },
+  (table) => ({
+    companyIdx: index("corporate_events_company_idx").on(table.companyName),
+    eventTypeIdx: index("corporate_events_type_idx").on(table.eventType),
+    datesIdx: index("corporate_events_dates_idx").on(table.startDate, table.endDate),
+  })
+)
