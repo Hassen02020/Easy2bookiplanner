@@ -16,10 +16,12 @@
     "test:meta-pipeline": "tsx scripts/test-meta-pipeline.ts"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@hookform/resolvers": "^3.9.1",
     "@neondatabase/serverless": "^1.1.0",
     "@radix-ui/react-slot": "^1.1.0",
     "@types/ws": "^8.18.1",
+    "ai": "^6.0.209",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "drizzle-orm": "^0.36.4",

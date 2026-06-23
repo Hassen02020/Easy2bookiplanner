@@ -140,9 +140,9 @@ interface OrchestratorResponse {
   }
 }
 
-async function getOpenAI() {
-  const { default: OpenAI } = await import("openai")
-  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+async function getGemini() {
+  const { GoogleGenerativeAI } = await import("@google/generative-ai")
+  return new GoogleGenerativeAI(process.env.GOOGLE_GENERATIVE_AI_API_KEY || "")
 }
 
 // ============================================================================
@@ -787,8 +787,10 @@ Guides locaux disponibles : ${
 ${passMember ? "Client membre PASS : bypass des marges sur hôtels locaux et tourisme alternatif." : ""}
 `
 
-    // Appel GPT-4o
-    const openai = await getOpenAI()
+    // Appel Gemini
+    const genAI = await getGemini()
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" })
+
     const systemPrompt = buildSystemPrompt(
       intent.language,
       finalPrice,
@@ -797,21 +799,20 @@ ${passMember ? "Client membre PASS : bypass des marges sur hôtels locaux et tou
       context
     )
 
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o",
-      messages: [
-        { role: "system", content: systemPrompt },
-        ...(previousMessages.length > 0
-          ? previousMessages.map((m) => ({ role: m.role as "user" | "assistant", content: m.content }))
-          : []),
-        { role: "user", content: message },
-      ],
-      temperature: 0.8,
-      max_tokens: 1600,
-      response_format: { type: "json_object" },
+    // Convertir le format OpenAI vers Gemini
+    const history = previousMessages.map((m) => ({
+      role: m.role === "assistant" ? "model" : "user",
+      parts: [{ text: m.content }],
+    }))
+
+    const chat = model.startChat({
+      history,
+      systemInstruction: systemPrompt,
     })
 
-    const rawContent = completion.choices[0]?.message?.content?.trim() || ""
+    const result = await chat.sendMessage(message)
+    const response = await result.response
+    const rawContent = response.text().trim()
     const clientTripId =
       typeof crypto !== "undefined" && crypto.randomUUID
         ? crypto.randomUUID()

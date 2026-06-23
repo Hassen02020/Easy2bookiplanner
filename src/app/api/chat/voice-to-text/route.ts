@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getSessionUsage, incrementSessionUsage } from "@/lib/services/sessionLimiter"
 
-async function getOpenAI() {
-  const { default: OpenAI } = await import("openai")
-  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+async function getGemini() {
+  const { GoogleGenerativeAI } = await import("@google/generative-ai")
+  return new GoogleGenerativeAI(process.env.GOOGLE_GENERATIVE_AI_API_KEY || "")
 }
 
 export async function POST(request: NextRequest) {
@@ -29,28 +29,30 @@ export async function POST(request: NextRequest) {
     const bytes = await audioFile.arrayBuffer()
     const buffer = Buffer.from(bytes)
 
-    const extension = getAudioExtension(audioFile.type)
-    const filename = `recording.${extension}`
+    // Gemini audio transcription
+    const genAI = await getGemini()
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" })
 
-    const whisperFormData = new FormData()
-    whisperFormData.append(
-      "file",
-      new Blob([buffer], { type: audioFile.type || "audio/webm" }),
-      filename
-    )
-    whisperFormData.append("model", "whisper-1")
-    whisperFormData.append("response_format", "json")
-    whisperFormData.append("language", "auto")
+    // Convertir le buffer en base64 pour Gemini
+    const base64Audio = buffer.toString("base64")
+    const mimeType = audioFile.type || "audio/webm"
 
-    const response = await (await getOpenAI()).audio.transcriptions.create({
-      file: new File([buffer], filename, { type: audioFile.type || "audio/webm" }),
-      model: "whisper-1",
-    })
+    const result = await model.generateContent([
+      {
+        inlineData: {
+          data: base64Audio,
+          mimeType,
+        },
+      },
+      "Transcris ce message audio en texte. Réponds uniquement avec le texte transcrit, sans aucun commentaire.",
+    ])
+
+    const response = await result.response
+    const text = response.text().trim()
 
     return NextResponse.json({
-      text: response.text,
+      text,
       mimeType: audioFile.type,
-      filename,
     })
   } catch (error) {
     console.error("Voice-to-text error:", error)
