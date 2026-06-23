@@ -128,8 +128,8 @@ export const getAllPricingRules = unstable_cache(
  * Invalide le cache des règles de tarification.
  * À appeler après chaque création, modification ou suppression depuis le dashboard admin.
  */
-export function invalidatePricingRulesCache(): void {
-  revalidateTag(PRICING_RULES_CACHE_TAG)
+export async function invalidatePricingRulesCache(): Promise<void> {
+  revalidateTag(PRICING_RULES_CACHE_TAG, { expire: 0 })
 }
 
 /**

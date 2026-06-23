@@ -39,3 +39,5 @@ yarn-error.log*
 # Drizzle local
 *.db
 *.db-journal
+
+.vercel
