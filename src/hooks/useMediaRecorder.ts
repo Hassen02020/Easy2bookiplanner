@@ -27,13 +27,17 @@ interface UseMediaRecorderReturn {
   reset: () => void
 }
 
-function getSupportedMimeType(): string {
+function getSupportedMimeType(): string | null {
+  if (typeof MediaRecorder === "undefined" || !MediaRecorder.isTypeSupported) {
+    return null
+  }
+
   const candidates = [
-    "audio/webm;codecs=opus",
-    "audio/webm",
     "audio/mp4",
     "audio/m4a",
     "audio/aac",
+    "audio/webm;codecs=opus",
+    "audio/webm",
     "audio/mp3",
     "audio/mpeg",
     "audio/ogg",
@@ -41,12 +45,12 @@ function getSupportedMimeType(): string {
   ]
 
   for (const mimeType of candidates) {
-    if (typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported(mimeType)) {
+    if (MediaRecorder.isTypeSupported(mimeType)) {
       return mimeType
     }
   }
 
-  return "audio/webm"
+  return null
 }
 
 function isAppleContainer(mimeType: string): boolean {
@@ -71,7 +75,7 @@ export function useMediaRecorder(options: UseMediaRecorderOptions = {}): UseMedi
   const chunksRef = useRef<Blob[]>([])
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const startTimeRef = useRef<number>(0)
-  const mimeTypeRef = useRef<string>("audio/webm")
+  const mimeTypeRef = useRef<string>("audio/webm") 
 
   const cleanupStream = useCallback(() => {
     if (streamRef.current) {
@@ -126,10 +130,12 @@ export function useMediaRecorder(options: UseMediaRecorderOptions = {}): UseMedi
         },
       })
 
-      const mimeType = getSupportedMimeType()
+      const detectedMimeType = getSupportedMimeType()
+      const mimeType = detectedMimeType ?? "audio/webm"
       mimeTypeRef.current = mimeType
 
-      const mediaRecorder = new MediaRecorder(stream, { mimeType })
+      const recorderOptions = detectedMimeType ? { mimeType: detectedMimeType } : {}
+      const mediaRecorder = new MediaRecorder(stream, recorderOptions)
       mediaRecorderRef.current = mediaRecorder
       streamRef.current = stream
 

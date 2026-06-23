@@ -20,13 +20,25 @@ export function trackClientPixel(event: MetaEventPayload) {
   }
 
   const fbq = (window as any).fbq as (...args: unknown[]) => void
-  fbq("track", event.eventName, {
-    eventID: event.eventId,
-    content_name: event.contentName,
-    content_category: event.contentCategory,
-    value: event.value,
-    currency: event.currency || "TND",
-  })
+  fbq(
+    "track",
+    event.eventName,
+    {
+      content_name: event.contentName,
+      content_category: event.contentCategory,
+      value: event.value,
+      currency: event.currency || "TND",
+      // Données utilisateur pour l'Advanced Matching (le pixel hache côté Meta)
+      em: event.email,
+      ph: event.phone,
+      fn: event.firstName,
+      ln: event.lastName,
+      ct: event.city,
+      st: event.region,
+      country: event.country,
+    },
+    { eventID: event.eventId }
+  )
 }
 
 export async function sendServerCapiEvent(event: MetaEventPayload) {

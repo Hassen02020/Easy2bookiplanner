@@ -13,6 +13,7 @@ interface AudioRecorderProps {
 export function AudioRecorder({ onTranscription, disabled }: AudioRecorderProps) {
   const { t } = useTranslation()
   const [isProcessing, setIsProcessing] = useState(false)
+  const [transcriptionError, setTranscriptionError] = useState<string | null>(null)
 
   const handleBlobReady = useCallback(
     async (blob: Blob) => {
@@ -28,6 +29,7 @@ export function AudioRecorder({ onTranscription, disabled }: AudioRecorderProps)
       formData.append("audio", blob, filename)
 
       try {
+        setTranscriptionError(null)
         const response = await fetch("/api/chat/voice-to-text", {
           method: "POST",
           body: formData,
@@ -41,7 +43,7 @@ export function AudioRecorder({ onTranscription, disabled }: AudioRecorderProps)
         onTranscription(data.text || "")
       } catch (error) {
         console.error("Transcription error:", error)
-        alert(t("errors.whisper_failed"))
+        setTranscriptionError(t("errors.whisper_failed"))
       } finally {
         setIsProcessing(false)
       }
@@ -62,6 +64,7 @@ export function AudioRecorder({ onTranscription, disabled }: AudioRecorderProps)
 
   const handlePointerDown = (event: React.PointerEvent) => {
     event.preventDefault()
+    setTranscriptionError(null)
     startRecording()
   }
 
@@ -105,6 +108,11 @@ export function AudioRecorder({ onTranscription, disabled }: AudioRecorderProps)
       {error && (
         <span className="absolute -bottom-8 left-1/2 z-10 w-48 -translate-x-1/2 rounded-md bg-red-500 px-2 py-1 text-xs text-white">
           {error}
+        </span>
+      )}
+      {transcriptionError && (
+        <span className="absolute -bottom-16 left-1/2 z-10 w-56 -translate-x-1/2 rounded-md bg-red-500 px-2 py-1 text-xs text-white">
+          {transcriptionError}
         </span>
       )}
     </button>

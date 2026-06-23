@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createHash } from "crypto"
 import { z } from "zod"
 import { getTelemetryData } from "@/lib/telemetry"
+import { normalizePhone } from "@/lib/phone"
 
 const trackEventSchema = z.object({
   eventName: z.enum(["PageView", "Lead", "InitiateCheckout", "Purchase"]),
@@ -27,6 +28,15 @@ function sha256(value: string | undefined): string | undefined {
   return createHash("sha256").update(value.toLowerCase().trim()).digest("hex")
 }
 
+function sha256Phone(value: string | undefined): string | undefined {
+  if (!value) return undefined
+  try {
+    return createHash("sha256").update(normalizePhone(value).toLowerCase().trim()).digest("hex")
+  } catch {
+    return sha256(value)
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = trackEventSchema.parse(await request.json())
@@ -47,7 +57,7 @@ export async function POST(request: NextRequest) {
           action_source: "website",
           user_data: {
             em: sha256(body.email),
-            ph: sha256(body.phone),
+            ph: sha256Phone(body.phone),
             fn: sha256(body.firstName),
             ln: sha256(body.lastName),
             ct: sha256(body.city || telemetry.city || undefined),

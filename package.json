@@ -11,11 +11,15 @@
     "db:push": "drizzle-kit push",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
-    "db:seed": "tsx src/db/seed.ts"
+    "db:seed": "tsx src/db/seed.ts",
+    "test:concurrency": "tsx scripts/test-concurrency.ts",
+    "test:meta-pipeline": "tsx scripts/test-meta-pipeline.ts"
   },
   "dependencies": {
+    "@hookform/resolvers": "^3.9.1",
     "@neondatabase/serverless": "^1.1.0",
     "@radix-ui/react-slot": "^1.1.0",
+    "@types/ws": "^8.18.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "drizzle-orm": "^0.36.4",
@@ -28,8 +32,8 @@
     "react-dom": "^18.3.1",
     "react-hook-form": "^7.54.2",
     "react-i18next": "^17.0.8",
-    "@hookform/resolvers": "^3.9.1",
     "tailwind-merge": "^2.6.0",
+    "ws": "^8.21.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {

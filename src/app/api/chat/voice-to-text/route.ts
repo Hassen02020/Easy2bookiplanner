@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { getSessionUsage, incrementSessionUsage } from "@/lib/services/sessionLimiter"
 
 async function getOpenAI() {
   const { default: OpenAI } = await import("openai")
@@ -7,6 +8,17 @@ async function getOpenAI() {
 
 export async function POST(request: NextRequest) {
   try {
+    const sessionUsage = await getSessionUsage()
+    if (sessionUsage.triggerPaywall) {
+      return NextResponse.json(
+        {
+          error: "Limite de messages gratuits atteinte. Débloquez l'accès complet pour continuer.",
+          triggerPaywall: true,
+        },
+        { status: 403 }
+      )
+    }
+
     const formData = await request.formData()
     const audioFile = formData.get("audio") as File | null
 
