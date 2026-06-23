@@ -91,5 +91,19 @@ export function middleware(request: NextRequest): NextResponse {
 
   // Réponse par défaut avec en-têtes de sécurité.
   const response = NextResponse.next()
+
+  // Initialise le cookie de session si absent.
+  const SESSION_COOKIE_NAME = "e2b_session"
+  if (!request.cookies.get(SESSION_COOKIE_NAME)?.value) {
+    const sessionToken = `e2b_${crypto.randomUUID()}`
+    response.cookies.set(SESSION_COOKIE_NAME, sessionToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24 * 30, // 30 days
+      path: "/",
+    })
+  }
+
   return applySecurityHeaders(response)
 }

@@ -2,7 +2,6 @@ import type { Metadata } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 import { I18nProvider } from "@/lib/i18n/provider"
 import { MetaPixel } from "@/components/meta-pixel"
-import { initializeSession } from "@/lib/actions/session"
 import { BRAND_CONFIG } from "@/config/brand"
 import "./globals.css"
 
@@ -24,13 +23,11 @@ export const metadata: Metadata = {
   },
 }
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
-  await initializeSession()
-
   return (
     <html lang="fr">
       <body
