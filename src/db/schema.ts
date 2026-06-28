@@ -313,3 +313,79 @@ export const corporateEvents = pgTable(
     datesIdx: index("corporate_events_dates_idx").on(table.startDate, table.endDate),
   })
 )
+
+export const reservationStatusEnum = pgEnum("reservation_status", ["pending", "confirmed", "cancelled"])
+
+export const promotions = pgTable(
+  "promotions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    hotelId: uuid("hotel_id").references(() => hotels.id, { onDelete: "cascade" }),
+    title: varchar("title", { length: 255 }).notNull(),
+    promoPrice: numeric("promo_price", { precision: 10, scale: 2 }).notNull(),
+    bookingStart: timestamp("booking_start", { withTimezone: true }),
+    bookingEnd: timestamp("booking_end", { withTimezone: true }),
+    travelStart: timestamp("travel_start", { withTimezone: true }),
+    travelEnd: timestamp("travel_end", { withTimezone: true }),
+    childPolicy: text("child_policy"),
+    isActive: boolean("is_active").default(true).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    hotelIdx: index("promotions_hotel_idx").on(table.hotelId),
+    activeIdx: index("promotions_active_idx").on(table.isActive),
+  })
+)
+
+export const leads = pgTable(
+  "leads",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    fullname: varchar("fullname", { length: 255 }).notNull(),
+    phone: varchar("phone", { length: 50 }).notNull(),
+    email: varchar("email", { length: 255 }),
+    city: varchar("city", { length: 255 }),
+    source: varchar("source", { length: 50 }).default("Website").notNull(),
+    marketingConsent: boolean("marketing_consent").default(false).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    phoneIdx: index("leads_phone_idx").on(table.phone),
+    sourceIdx: index("leads_source_idx").on(table.source),
+  })
+)
+
+export const conversations = pgTable(
+  "conversations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    leadId: uuid("lead_id").references(() => leads.id, { onDelete: "cascade" }),
+    userMessage: text("user_message").notNull(),
+    botResponse: text("bot_response").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    leadIdx: index("conversations_lead_idx").on(table.leadId),
+    createdAtIdx: index("conversations_created_at_idx").on(table.createdAt),
+  })
+)
+
+export const reservations = pgTable(
+  "reservations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    leadId: uuid("lead_id").references(() => leads.id, { onDelete: "cascade" }),
+    hotelId: uuid("hotel_id").references(() => hotels.id, { onDelete: "cascade" }),
+    checkin: timestamp("checkin", { withTimezone: true }).notNull(),
+    checkout: timestamp("checkout", { withTimezone: true }).notNull(),
+    adults: integer("adults").default(1).notNull(),
+    children: integer("children").default(0).notNull(),
+    status: reservationStatusEnum("status").default("pending").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    leadIdx: index("reservations_lead_idx").on(table.leadId),
+    hotelIdx: index("reservations_hotel_idx").on(table.hotelId),
+    statusIdx: index("reservations_status_idx").on(table.status),
+  })
+)

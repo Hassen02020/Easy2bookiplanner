@@ -30,16 +30,13 @@ export async function POST(request: NextRequest) {
     const telemetry = await getTelemetryData()
 
     const ai = new GoogleGenAI({
-      apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY || "",
+      apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GOOGLE_API_KEY || "",
     })
 
     const lastMessage = messages[messages.length - 1]
     const userMessage = lastMessage?.content || ""
 
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: `
-Tu es Easy2Book Assistant, l'assistant officiel de l'agence Easy2Book spécialisée dans les réservations d'hôtels et séjours en Tunisie.
+    const systemPrompt = `Tu es Easy2Book Assistant, l'assistant officiel de l'agence Easy2Book spécialisée dans les réservations d'hôtels et séjours en Tunisie.
 
 MISSION :
 Aider les clients à rechercher, comparer et réserver des hôtels, séjours, promotions et offres touristiques.
@@ -126,18 +123,28 @@ Variations à prendre en compte :
 * Week-ends et jours fériés peuvent augmenter les tarifs
 
 Toujours terminer par :
-📞 Easy2Book : +216 98140514
+📞 Easy2Book : +216 98140514`
+
+    const conversationHistory = messages.slice(-6).map((m: { role: string; content: string }) => 
+      `${m.role === "assistant" ? "Assistant" : "Client"}: ${m.content}`
+    ).join("\n")
+
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: `${systemPrompt}
 
 Historique de la conversation :
-${messages.slice(-6).map((m: { role: string; content: string }) => `${m.role === "assistant" ? "Assistant" : "Client"}: ${m.content}`).join("\n")}
+${conversationHistory}
 
 Question client :
 ${userMessage}
 `,
     })
 
+    const responseText = response.text
+
     return NextResponse.json({
-      content: response.text,
+      content: responseText || "Désolé, je n'ai pas pu générer une réponse. Contactez-nous au 📞 +216 98140514.",
       lang,
       telemetry,
     })
@@ -147,9 +154,25 @@ ${userMessage}
     }
 
     console.error("Chat error:", error)
-    return NextResponse.json(
-      { error: "Internal server error", details: (error as Error).message },
-      { status: 500 }
-    )
+    const errorMsg = (error as Error).message || ""
+    
+    if (errorMsg.includes("429") || errorMsg.includes("quota")) {
+      return NextResponse.json({
+        content: "Notre service est temporairement surchargé. Pour une assistance immédiate, contactez-nous au 📞 +216 98140514.",
+        telemetry: await getTelemetryData(),
+      })
+    }
+
+    if (errorMsg.includes("API_KEY") || errorMsg.includes("api key") || errorMsg.includes("401") || errorMsg.includes("403")) {
+      return NextResponse.json({
+        content: "Notre assistant IA est en cours de configuration. Pour toute demande, contactez-nous au 📞 +216 98140514.",
+        telemetry: await getTelemetryData(),
+      })
+    }
+
+    return NextResponse.json({
+      content: "Une erreur est survenue. Pour une assistance immédiate, contactez-nous au 📞 +216 98140514.",
+      telemetry: await getTelemetryData(),
+    })
   }
 }
