@@ -15,9 +15,9 @@ export const BRAND_CONFIG = {
     website: process.env.NEXT_PUBLIC_WEBSITE_URL || "https://easy2book.tn",
   },
   logo: {
-    light: "/assets/logo-light.svg",
-    dark: "/assets/logo-dark.svg",
-    favicon: "/assets/favicon.svg",
+    light: "/assets/logo.jpg",
+    dark: "/assets/logo.jpg",
+    favicon: "/assets/logo.jpg",
   },
 } as const
 
