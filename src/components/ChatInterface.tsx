@@ -12,13 +12,14 @@
 
 import { useState, useRef, useEffect, useCallback } from "react"
 import { useTranslation } from "react-i18next"
-import { Send, Loader2 } from "lucide-react"
+import { Send, Loader2, MessageCircle } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { LanguageSwitcher } from "@/components/language-switcher"
 import { AudioRecorder } from "@/components/audio-recorder"
 import { LeadForm } from "@/components/lead-form"
+import { BRAND_CONFIG } from "@/config/brand"
 
 export type SupportedLanguage = "fr" | "en" | "ar"
 
@@ -203,15 +204,31 @@ export function ChatInterface({ className }: ChatInterfaceProps) {
       {/* En-tête fixe */}
       <header className="flex shrink-0 items-center justify-between border-b bg-background px-4 py-3">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground font-bold">
-            E2B
+          <div className="flex h-10 w-10 items-center justify-center rounded-full overflow-hidden">
+            <img
+              src={BRAND_CONFIG.logo.favicon}
+              alt="Easy2Book"
+              className="h-10 w-10 object-contain"
+            />
           </div>
           <div>
             <h1 className="text-base font-semibold leading-tight">{t("app.title")}</h1>
             <p className="text-xs text-muted-foreground">{t("app.subtitle")}</p>
           </div>
         </div>
-        <LanguageSwitcher />
+        <div className="flex items-center gap-2">
+          <a
+            href={`https://wa.me/${BRAND_CONFIG.whatsapp.replace(/[^0-9]/g, "")}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-green-500 text-white hover:bg-green-600 transition-colors"
+            aria-label="Contactez-nous sur WhatsApp"
+            title="WhatsApp: 98140514"
+          >
+            <MessageCircle className="h-5 w-5" />
+          </a>
+          <LanguageSwitcher />
+        </div>
       </header>
 
       {/* Zone de messages scrollable */}
