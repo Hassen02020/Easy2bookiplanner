@@ -20,6 +20,8 @@ import { getSessionUsage, incrementSessionUsage } from "@/lib/services/sessionLi
 import { db } from "@/db"
 import { packageInventory, aiMarketTrends, clientTrips } from "@/db/schema"
 import { eq, and, sql } from "drizzle-orm"
+import { google } from "@ai-sdk/google"
+import { generateText } from "ai"
 
 /**
  * POST /api/chat/orchestrator
@@ -140,9 +142,8 @@ interface OrchestratorResponse {
   }
 }
 
-async function getGemini() {
-  const { GoogleGenerativeAI } = await import("@google/generative-ai")
-  return new GoogleGenerativeAI(process.env.GOOGLE_GENERATIVE_AI_API_KEY || "")
+async function getGeminiModel() {
+  return google("gemini-2.0-flash")
 }
 
 // ============================================================================
@@ -787,10 +788,7 @@ Guides locaux disponibles : ${
 ${passMember ? "Client membre PASS : bypass des marges sur hôtels locaux et tourisme alternatif." : ""}
 `
 
-    // Appel Gemini
-    const genAI = await getGemini()
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" })
-
+    // Appel Gemini via Vercel AI SDK
     const systemPrompt = buildSystemPrompt(
       intent.language,
       finalPrice,
@@ -799,20 +797,19 @@ ${passMember ? "Client membre PASS : bypass des marges sur hôtels locaux et tou
       context
     )
 
-    // Convertir le format OpenAI vers Gemini
-    const history = previousMessages.map((m) => ({
-      role: m.role === "assistant" ? "model" : "user",
-      parts: [{ text: m.content }],
-    }))
-
-    const chat = model.startChat({
-      history,
-      systemInstruction: systemPrompt,
+    const result = await generateText({
+      model: google("gemini-2.0-flash"),
+      system: systemPrompt,
+      messages: [
+        ...previousMessages.map((m) => ({
+          role: m.role as "user" | "assistant",
+          content: m.content,
+        })),
+        { role: "user" as const, content: message },
+      ],
     })
 
-    const result = await chat.sendMessage(message)
-    const response = await result.response
-    const rawContent = response.text().trim()
+    const rawContent = result.text.trim()
     const clientTripId =
       typeof crypto !== "undefined" && crypto.randomUUID
         ? crypto.randomUUID()
