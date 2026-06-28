@@ -44,10 +44,13 @@ export async function POST(request: NextRequest) {
     })
 
     // Convertir les messages OpenAI vers Gemini
-    const history = messages.map((m: { role: string; content: string }) => ({
-      role: m.role === "assistant" ? "model" : "user",
-      parts: [{ text: m.content }],
-    }))
+    // Gemini exige que le premier message soit 'user', on filtre les messages 'model' initiaux
+    const history = messages
+      .map((m: { role: string; content: string }) => ({
+        role: m.role === "assistant" ? "model" : "user",
+        parts: [{ text: m.content }],
+      }))
+      .filter((m, i) => !(m.role === "model" && i === 0))
 
     // Dernier message utilisateur
     const lastMessage = messages[messages.length - 1]
