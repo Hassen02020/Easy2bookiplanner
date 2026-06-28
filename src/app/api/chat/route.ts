@@ -7,9 +7,9 @@ import { formatIndicativePrice } from "@/lib/pricing"
 import { getTelemetryData } from "@/lib/telemetry"
 import { getSessionUsage, incrementSessionUsage } from "@/lib/services/sessionLimiter"
 
-async function getOpenAI() {
-  const { default: OpenAI } = await import("openai")
-  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+async function getGemini() {
+  const { GoogleGenerativeAI } = await import("@google/generative-ai")
+  return new GoogleGenerativeAI(process.env.GOOGLE_GENERATIVE_AI_API_KEY || "")
 }
 
 export async function POST(request: NextRequest) {
@@ -37,131 +37,79 @@ export async function POST(request: NextRequest) {
     const telemetry = await getTelemetryData()
     const systemPrompt = buildSystemPrompt(lang)
 
-    const response = await (await getOpenAI()).chat.completions.create({
-      model: "gpt-4o",
-      messages: [
-        { role: "system", content: systemPrompt },
-        ...messages,
-      ],
-      tools: [
-        {
-          type: "function",
-          function: {
-            name: "searchHotels",
-            description: "Search available hotels in Tunisian destinations by city and minimum stars",
-            parameters: {
-              type: "object",
-              properties: {
-                destination: { type: "string" },
-                stars: { type: "number", minimum: 1, maximum: 5 },
-              },
-              required: ["destination"],
-            },
-          },
-        },
-        {
-          type: "function",
-          function: {
-            name: "searchTrips",
-            description: "Search organized trips and packages such as Istanbul, Omra, or beach destinations",
-            parameters: {
-              type: "object",
-              properties: {
-                destination: { type: "string" },
-                type: { type: "string", enum: ["organized", "omra", "cruise", "beach"] },
-              },
-              required: ["destination"],
-            },
-          },
-        },
-      ],
-      tool_choice: "auto",
-      temperature: 0.7,
-      max_tokens: 1500,
+    const genAI = await getGemini()
+    const model = genAI.getGenerativeModel({
+      model: "gemini-1.5-flash",
+      systemInstruction: systemPrompt,
     })
 
-    const assistantMessage = response.choices[0]?.message
+    // Convertir les messages OpenAI vers Gemini
+    const history = messages.map((m: { role: string; content: string }) => ({
+      role: m.role === "assistant" ? "model" : "user",
+      parts: [{ text: m.content }],
+    }))
 
-    if (assistantMessage?.tool_calls && assistantMessage.tool_calls.length > 0) {
-      const toolResults = await Promise.all(
-        assistantMessage.tool_calls.map(async (toolCall) => {
-          const name = toolCall.function.name
-          const args = JSON.parse(toolCall.function.arguments)
+    // Dernier message utilisateur
+    const lastMessage = messages[messages.length - 1]
+    const previousHistory = history.slice(0, -1)
 
-          if (name === "searchHotels") {
-            const parsed = searchHotelsSchema.parse(args)
-            const hotels = await searchHotels(parsed.destination, lang, parsed.stars)
-            return {
-              tool_call_id: toolCall.id,
-              role: "tool" as const,
-              content: JSON.stringify(
-                hotels.map((hotel) => ({
-                  id: hotel.id,
-                  name: hotel.name,
-                  destination: hotel.destination,
-                  stars: hotel.stars,
-                  price: formatIndicativePrice(hotel.displayPrice),
-                  description: hotel.description,
-                  amenities: hotel.amenities,
-                }))
-              ),
-            }
-          }
+    const chat = model.startChat({ history: previousHistory })
+    const result = await chat.sendMessage(lastMessage.content)
+    const response = await result.response
+    const responseText = response.text()
 
-          if (name === "searchTrips") {
-            const parsed = searchTripsSchema.parse(args)
-            const trips = await searchTrips(parsed.destination, lang, parsed.type)
-            return {
-              tool_call_id: toolCall.id,
-              role: "tool" as const,
-              content: JSON.stringify(
-                trips.map((trip) => ({
-                  id: trip.id,
-                  title: trip.title,
-                  departureDate: trip.departureDate,
-                  returnDate: trip.returnDate,
-                  price: formatIndicativePrice(trip.displayPrice),
-                  availableSeats: trip.availableSeats,
-                  description: trip.description,
-                  includedServices: trip.includedServices,
-                }))
-              ),
-            }
-          }
+    // Vérifier si l'IA veut faire une recherche d'hôtels ou trips
+    const hotelMatch = responseText.match(/searchHotels?:\s*(.+)/i)
+    const tripMatch = responseText.match(/searchTrips?:\s*(.+)/i)
 
-          return {
-            tool_call_id: toolCall.id,
-            role: "tool" as const,
-            content: JSON.stringify({ error: "Unknown tool" }),
-          }
-        })
+    if (hotelMatch) {
+      const destination = hotelMatch[1].trim()
+      const hotels = await searchHotels(destination, lang)
+      const searchResults = hotels.map((hotel) => ({
+        id: hotel.id,
+        name: hotel.name,
+        destination: hotel.destination,
+        stars: hotel.stars,
+        price: formatIndicativePrice(hotel.displayPrice),
+        description: hotel.description,
+        amenities: hotel.amenities,
+      }))
+
+      // Deuxième appel avec les résultats
+      const result2 = await chat.sendMessage(
+        `Voici les hôtels trouvés: ${JSON.stringify(searchResults)}. Recommande les meilleurs à l'utilisateur en français.`
       )
-
-      const finalResponse = await (await getOpenAI()).chat.completions.create({
-        model: "gpt-4o",
-        messages: [
-          { role: "system", content: systemPrompt },
-          ...messages,
-          assistantMessage,
-          ...toolResults,
-        ],
-        temperature: 0.7,
-        max_tokens: 1500,
-      })
-
-      const searchResults = toolResults
-        .map((result) => {
-          try {
-            return JSON.parse(result.content)
-          } catch {
-            return null
-          }
-        })
-        .flat()
-        .filter(Boolean)
+      const response2 = await result2.response
 
       return NextResponse.json({
-        content: finalResponse.choices[0]?.message?.content,
+        content: response2.text(),
+        lang,
+        telemetry,
+        results: searchResults,
+      })
+    }
+
+    if (tripMatch) {
+      const destination = tripMatch[1].trim()
+      const trips = await searchTrips(destination, lang)
+      const searchResults = trips.map((trip) => ({
+        id: trip.id,
+        title: trip.title,
+        departureDate: trip.departureDate,
+        returnDate: trip.returnDate,
+        price: formatIndicativePrice(trip.displayPrice),
+        availableSeats: trip.availableSeats,
+        description: trip.description,
+        includedServices: trip.includedServices,
+      }))
+
+      const result2 = await chat.sendMessage(
+        `Voici les voyages trouvés: ${JSON.stringify(searchResults)}. Recommande les meilleurs à l'utilisateur en français.`
+      )
+      const response2 = await result2.response
+
+      return NextResponse.json({
+        content: response2.text(),
         lang,
         telemetry,
         results: searchResults,
@@ -169,7 +117,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({
-      content: assistantMessage?.content,
+      content: responseText,
       lang,
       telemetry,
     })
