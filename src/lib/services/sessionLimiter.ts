@@ -10,7 +10,7 @@
 
 import { cookies } from "next/headers"
 
-const MAX_FREE_MESSAGES = 3
+const MAX_FREE_MESSAGES = 15
 
 export interface SessionUsage {
   sessionId: string
