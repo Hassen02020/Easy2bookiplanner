@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
-import { buildSystemPrompt } from "@/lib/ai/system-prompt"
 import { chatRequestSchema } from "@/lib/ai/tools"
 import { getTelemetryData } from "@/lib/telemetry"
 import { getSessionUsage, incrementSessionUsage } from "@/lib/services/sessionLimiter"
-import { google } from "@ai-sdk/google"
-import { generateText } from "ai"
+import { GoogleGenAI } from "@google/genai"
 
 export async function POST(request: NextRequest) {
   try {
@@ -30,16 +28,37 @@ export async function POST(request: NextRequest) {
     await incrementSessionUsage()
 
     const telemetry = await getTelemetryData()
-    const systemPrompt = buildSystemPrompt(lang)
 
-    const result = await generateText({
-      model: google("gemini-2.0-flash"),
-      system: systemPrompt,
-      messages,
+    const ai = new GoogleGenAI({
+      apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY || "",
+    })
+
+    const lastMessage = messages[messages.length - 1]
+    const userMessage = lastMessage?.content || ""
+
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: `
+Tu es Easy2Book Assistant, un conseiller de voyage expert pour la Tunisie.
+
+Règles :
+- Réponds en arabe ou français selon la langue du client
+- Tu aides pour hôtels en Tunisie, voyages organisés, omra, et circuits
+- Propose offres et promotions quand pertinent
+- Sois court, professionnel et amical
+- Termine toujours avec :
+📞 Easy2Book : +216 98140514
+
+Historique de la conversation :
+${messages.slice(-6).map((m: { role: string; content: string }) => `${m.role === "assistant" ? "Assistant" : "Client"}: ${m.content}`).join("\n")}
+
+Question client :
+${userMessage}
+`,
     })
 
     return NextResponse.json({
-      content: result.text,
+      content: response.text,
       lang,
       telemetry,
     })
