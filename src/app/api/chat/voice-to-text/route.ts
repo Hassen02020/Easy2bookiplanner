@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
 
     // Gemini audio transcription
     const genAI = await getGemini()
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" })
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" })
 
     // Convertir le buffer en base64 pour Gemini
     const base64Audio = buffer.toString("base64")

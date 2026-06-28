@@ -789,7 +789,7 @@ ${passMember ? "Client membre PASS : bypass des marges sur hôtels locaux et tou
 
     // Appel Gemini
     const genAI = await getGemini()
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" })
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" })
 
     const systemPrompt = buildSystemPrompt(
       intent.language,
