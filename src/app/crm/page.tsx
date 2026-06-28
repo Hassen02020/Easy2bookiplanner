@@ -1,19 +1,24 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { LayoutDashboard, Hotel, Flame, Users, MessageSquare, Calendar, Settings } from "lucide-react"
+import { LayoutDashboard, Hotel, Flame, Users, MessageSquare, Calendar, Settings, Plane, Ship, Compass, TrendingUp, Home } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-type Tab = "dashboard" | "hotels" | "promotions" | "leads" | "conversations" | "reservations" | "settings"
+type Tab = "dashboard" | "hotels" | "guesthouses" | "flights" | "boats" | "promotions" | "leads" | "conversations" | "reservations" | "excursions" | "marketing" | "settings"
 
 const menuItems: { id: Tab; label: string; icon: typeof LayoutDashboard }[] = [
-  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { id: "hotels", label: "Hôtels", icon: Hotel },
-  { id: "promotions", label: "Promotions", icon: Flame },
-  { id: "leads", label: "Prospects", icon: Users },
-  { id: "conversations", label: "Conversations", icon: MessageSquare },
-  { id: "reservations", label: "Réservations", icon: Calendar },
-  { id: "settings", label: "Paramètres", icon: Settings },
+  { id: "dashboard", label: "📊 Dashboard", icon: LayoutDashboard },
+  { id: "hotels", label: "🏨 Hôtels", icon: Hotel },
+  { id: "guesthouses", label: "🏡 Maisons d'hôtes", icon: Home },
+  { id: "flights", label: "✈ Vols", icon: Plane },
+  { id: "boats", label: "⛴ Bateaux", icon: Ship },
+  { id: "excursions", label: "🎯 Excursions", icon: Compass },
+  { id: "promotions", label: "🔥 Promotions", icon: Flame },
+  { id: "leads", label: "👥 Clients", icon: Users },
+  { id: "conversations", label: "💬 Conversations IA", icon: MessageSquare },
+  { id: "reservations", label: "📅 Réservations", icon: Calendar },
+  { id: "marketing", label: "📈 Marketing", icon: TrendingUp },
+  { id: "settings", label: "⚙ Paramètres", icon: Settings },
 ]
 
 export default function CRMDashboard() {
@@ -68,10 +73,15 @@ export default function CRMDashboard() {
       <main className="flex-1 overflow-y-auto p-8">
         {activeTab === "dashboard" && <DashboardView data={data} />}
         {activeTab === "hotels" && <HotelsView data={data} />}
+        {activeTab === "guesthouses" && <PlaceholderView title="🏡 Maisons d'hôtes" />}
+        {activeTab === "flights" && <PlaceholderView title="✈ Vols" />}
+        {activeTab === "boats" && <PlaceholderView title="⛴ Bateaux" />}
+        {activeTab === "excursions" && <PlaceholderView title="🎯 Excursions" />}
         {activeTab === "promotions" && <PromotionsView />}
         {activeTab === "leads" && <LeadsView />}
         {activeTab === "conversations" && <ConversationsView />}
         {activeTab === "reservations" && <ReservationsView />}
+        {activeTab === "marketing" && <MarketingView />}
         {activeTab === "settings" && <SettingsView />}
       </main>
     </div>
@@ -217,6 +227,41 @@ function SettingsView() {
           <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
           <input type="text" value="contact@easy2book.tn" readOnly className="w-full px-4 py-2 border border-gray-200 rounded-lg bg-gray-50" />
         </div>
+      </div>
+    </div>
+  )
+}
+
+function PlaceholderView({ title }: { title: string }) {
+  return (
+    <div>
+      <h2 className="text-2xl font-bold text-gray-900 mb-6">{title}</h2>
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center text-gray-400">
+        Module en cours de configuration
+      </div>
+    </div>
+  )
+}
+
+function MarketingView() {
+  return (
+    <div>
+      <h2 className="text-2xl font-bold text-gray-900 mb-6">📈 Marketing</h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+        {[
+          { label: "🔥 Offre Flash", desc: "Promotions limitées dans le temps" },
+          { label: "👨‍👩‍👧 Promo Famille", desc: "Offres familiales" },
+          { label: "💑 Promo Couple", desc: "Séjours romantiques" },
+          { label: "⚡ Last Minute", desc: "Départs imminents" },
+        ].map((offer) => (
+          <div key={offer.label} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <p className="text-lg font-bold text-gray-900 mb-2">{offer.label}</p>
+            <p className="text-sm text-gray-500">{offer.desc}</p>
+          </div>
+        ))}
+      </div>
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center text-gray-400">
+        Aucune campagne marketing active
       </div>
     </div>
   )
