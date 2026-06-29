@@ -497,3 +497,103 @@ export const referrals = pgTable(
     leadIdx: index("referrals_lead_idx").on(table.leadId),
   })
 )
+
+export const guesthouses = pgTable(
+  "guesthouses",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    name: varchar("name", { length: 255 }).notNull(),
+    destination: varchar("destination", { length: 255 }).notNull(),
+    basePricePerNight: numeric("base_price_per_night", { precision: 10, scale: 2 }).notNull(),
+    capacity: integer("capacity").default(2).notNull(),
+    amenities: text("amenities"),
+    isActive: boolean("is_active").default(true).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    destinationIdx: index("guesthouses_destination_idx").on(table.destination),
+  })
+)
+
+export const documents = pgTable(
+  "documents",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    leadId: uuid("lead_id").references(() => leads.id, { onDelete: "cascade" }),
+    type: varchar("type", { length: 50 }).notNull(),
+    content: jsonb("content").notNull(),
+    fileUrl: varchar("file_url", { length: 500 }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    leadIdx: index("documents_lead_idx").on(table.leadId),
+    typeIdx: index("documents_type_idx").on(table.type),
+  })
+)
+
+export const leadScores = pgTable(
+  "lead_scores",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    leadId: uuid("lead_id").references(() => leads.id, { onDelete: "cascade" }).notNull(),
+    score: varchar("score", { length: 20 }).notNull(),
+    reason: text("reason"),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().$onUpdate(() => new Date()).notNull(),
+  },
+  (table) => ({
+    leadIdx: index("lead_scores_lead_idx").on(table.leadId),
+    scoreIdx: index("lead_scores_score_idx").on(table.score),
+  })
+)
+
+export const partners = pgTable(
+  "partners",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    name: varchar("name", { length: 255 }).notNull(),
+    type: varchar("type", { length: 50 }).notNull(),
+    phone: varchar("phone", { length: 50 }),
+    email: varchar("email", { length: 255 }),
+    isActive: boolean("is_active").default(true).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    typeIdx: index("partners_type_idx").on(table.type),
+  })
+)
+
+export const inventory = pgTable(
+  "inventory",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    partnerId: uuid("partner_id").references(() => partners.id, { onDelete: "cascade" }),
+    itemType: varchar("item_type", { length: 50 }).notNull(),
+    itemRef: uuid("item_ref"),
+    availableUnits: integer("available_units").default(0).notNull(),
+    date: timestamp("date", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    partnerIdx: index("inventory_partner_idx").on(table.partnerId),
+    typeIdx: index("inventory_type_idx").on(table.itemType),
+  })
+)
+
+export const payments = pgTable(
+  "payments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    leadId: uuid("lead_id").references(() => leads.id, { onDelete: "cascade" }),
+    reservationId: uuid("reservation_id").references(() => reservations.id, { onDelete: "cascade" }),
+    amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
+    currency: varchar("currency", { length: 10 }).default("DT").notNull(),
+    method: varchar("method", { length: 50 }),
+    status: varchar("status", { length: 20 }).default("pending").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    leadIdx: index("payments_lead_idx").on(table.leadId),
+    reservationIdx: index("payments_reservation_idx").on(table.reservationId),
+    statusIdx: index("payments_status_idx").on(table.status),
+  })
+)
