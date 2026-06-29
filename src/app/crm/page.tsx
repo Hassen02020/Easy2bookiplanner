@@ -1,10 +1,10 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { LayoutDashboard, Hotel, Flame, Users, MessageSquare, Calendar, Settings, Plane, Ship, Compass, TrendingUp, Home, BarChart3 } from "lucide-react"
+import { LayoutDashboard, Hotel, Flame, Users, MessageSquare, Calendar, Settings, Plane, Ship, Compass, TrendingUp, Home, BarChart3, Gift, Building2, Share2, Bot } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-type Tab = "dashboard" | "hotels" | "guesthouses" | "flights" | "boats" | "promotions" | "leads" | "conversations" | "reservations" | "excursions" | "marketing" | "analytics" | "settings"
+type Tab = "dashboard" | "hotels" | "guesthouses" | "flights" | "boats" | "promotions" | "leads" | "conversations" | "reservations" | "excursions" | "marketing" | "analytics" | "loyalty" | "agencies" | "affiliation" | "ai-agents" | "settings"
 
 const menuItems: { id: Tab; label: string; icon: typeof LayoutDashboard }[] = [
   { id: "dashboard", label: "📊 Dashboard", icon: LayoutDashboard },
@@ -19,6 +19,10 @@ const menuItems: { id: Tab; label: string; icon: typeof LayoutDashboard }[] = [
   { id: "reservations", label: "📅 Réservations", icon: Calendar },
   { id: "marketing", label: "📈 Marketing", icon: TrendingUp },
   { id: "analytics", label: "📊 Analytics", icon: BarChart3 },
+  { id: "loyalty", label: "🎁 Fidélité", icon: Gift },
+  { id: "agencies", label: "🏢 Multi-Agences", icon: Building2 },
+  { id: "affiliation", label: "🔗 Affiliation", icon: Share2 },
+  { id: "ai-agents", label: "🤖 Agents IA", icon: Bot },
   { id: "settings", label: "⚙ Paramètres", icon: Settings },
 ]
 
@@ -84,6 +88,10 @@ export default function CRMDashboard() {
         {activeTab === "reservations" && <ReservationsView />}
         {activeTab === "marketing" && <MarketingView />}
         {activeTab === "analytics" && <AnalyticsView />}
+        {activeTab === "loyalty" && <LoyaltyView />}
+        {activeTab === "agencies" && <AgenciesView />}
+        {activeTab === "affiliation" && <AffiliationView />}
+        {activeTab === "ai-agents" && <AIAgentsView />}
         {activeTab === "settings" && <SettingsView />}
       </main>
     </div>
@@ -311,6 +319,127 @@ function AnalyticsView() {
             <p className="text-xs text-gray-400 mt-2">Action : newsletter</p>
           </div>
         </div>
+      </div>
+    </div>
+  )
+}
+
+function LoyaltyView() {
+  const rewards = [
+    { points: "100 pts", reward: "🎁 Réduction", color: "bg-blue-50 border-blue-200 text-blue-700" },
+    { points: "300 pts", reward: "🎁 Excursion gratuite", color: "bg-green-50 border-green-200 text-green-700" },
+    { points: "500 pts", reward: "🎁 Remise spéciale", color: "bg-purple-50 border-purple-200 text-purple-700" },
+    { points: "1000 pts", reward: "🎁 Séjour offert", color: "bg-orange-50 border-orange-200 text-orange-700" },
+  ]
+  return (
+    <div>
+      <h2 className="text-2xl font-bold text-gray-900 mb-6">🎁 Fidélité EasyPoints</h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+        {rewards.map((r) => (
+          <div key={r.points} className={cn("rounded-xl border p-6 text-center", r.color)}>
+            <p className="text-2xl font-bold mb-2">{r.points}</p>
+            <p className="text-sm">{r.reward}</p>
+          </div>
+        ))}
+      </div>
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+        <h3 className="text-lg font-bold text-gray-900 mb-4">👥 Parrainage</h3>
+        <p className="text-sm text-gray-600">Client invite ami → 🎁 crédit voyage + 🎁 réduction réservation</p>
+      </div>
+      <div className="mt-6 bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center text-gray-400">
+        Aucun point de fidélité enregistré
+      </div>
+    </div>
+  )
+}
+
+function AgenciesView() {
+  const roles = [
+    { role: "👑 Super Admin", desc: "Accès complet à toutes les agences" },
+    { role: "👨‍💼 Manager", desc: "Gère son agence" },
+    { role: "👩‍💻 Agent", desc: "Gère clients et réservations" },
+    { role: "👤 Partenaire", desc: "Accès limité à ses offres" },
+  ]
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-2xl font-bold text-gray-900">🏢 Multi-Agences</h2>
+        <button className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90">+ Ajouter agence</button>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+        {["Bizerte", "Tunis", "Sousse", "Sfax"].map((city) => (
+          <div key={city} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <p className="text-lg font-bold text-gray-900">Easy2Book {city}</p>
+            <p className="text-sm text-gray-500 mt-1">Agence active</p>
+          </div>
+        ))}
+      </div>
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+        <h3 className="text-lg font-bold text-gray-900 mb-4">Permissions</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {roles.map((r) => (
+            <div key={r.role} className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+              <p className="font-bold text-gray-900">{r.role}</p>
+              <p className="text-sm text-gray-500 mt-1">{r.desc}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function AffiliationView() {
+  return (
+    <div>
+      <h2 className="text-2xl font-bold text-gray-900 mb-6">🔗 Programme Affiliation</h2>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <p className="text-3xl font-bold text-blue-600 mb-2">🔗</p>
+          <p className="font-bold text-gray-900">Lien unique</p>
+          <p className="text-sm text-gray-500 mt-1">easy2book.com/ref/xxx</p>
+        </div>
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <p className="text-3xl font-bold text-green-600 mb-2">💰</p>
+          <p className="font-bold text-gray-900">Commission</p>
+          <p className="text-sm text-gray-500 mt-1">Sur chaque réservation</p>
+        </div>
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <p className="text-3xl font-bold text-orange-600 mb-2">🏆</p>
+          <p className="font-bold text-gray-900">Bonus volume</p>
+          <p className="text-sm text-gray-500 mt-1">Récompenses mensuelles</p>
+        </div>
+      </div>
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center text-gray-400">
+        Aucun affilié enregistré
+      </div>
+    </div>
+  )
+}
+
+function AIAgentsView() {
+  const agents = [
+    { icon: "🏨", name: "Hotel Expert AI", mission: "Hôtels, chambres, promotions", color: "bg-blue-50 border-blue-200" },
+    { icon: "✈", name: "Flight Expert AI", mission: "Vols, bagages, escales", color: "bg-green-50 border-green-200" },
+    { icon: "🎯", name: "Activity Expert AI", mission: "Excursions, activités", color: "bg-orange-50 border-orange-200" },
+    { icon: "🧳", name: "Travel Planner AI", mission: "Programme quotidien", color: "bg-purple-50 border-purple-200" },
+    { icon: "👥", name: "CRM AI", mission: "Leads, ventes, suivi", color: "bg-pink-50 border-pink-200" },
+  ]
+  return (
+    <div>
+      <h2 className="text-2xl font-bold text-gray-900 mb-6">🤖 Agents IA Spécialisés</h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {agents.map((agent) => (
+          <div key={agent.name} className={cn("rounded-xl border p-6", agent.color)}>
+            <p className="text-3xl mb-3">{agent.icon}</p>
+            <p className="font-bold text-gray-900">{agent.name}</p>
+            <p className="text-sm text-gray-600 mt-1">{agent.mission}</p>
+            <div className="mt-4 flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-green-500" />
+              <span className="text-xs text-gray-500">Actif</span>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   )

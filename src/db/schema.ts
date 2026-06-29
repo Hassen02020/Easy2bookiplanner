@@ -389,3 +389,111 @@ export const reservations = pgTable(
     statusIdx: index("reservations_status_idx").on(table.status),
   })
 )
+
+export const loyaltyPoints = pgTable(
+  "loyalty_points",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    leadId: uuid("lead_id").references(() => leads.id, { onDelete: "cascade" }),
+    points: integer("points").default(0).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    leadIdx: index("loyalty_points_lead_idx").on(table.leadId),
+  })
+)
+
+export const activities = pgTable(
+  "activities",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    name: varchar("name", { length: 255 }).notNull(),
+    destination: varchar("destination", { length: 255 }).notNull(),
+    price: numeric("price", { precision: 10, scale: 2 }),
+    season: varchar("season", { length: 50 }),
+    description: text("description"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    destinationIdx: index("activities_destination_idx").on(table.destination),
+    seasonIdx: index("activities_season_idx").on(table.season),
+  })
+)
+
+export const itineraries = pgTable(
+  "itineraries",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    leadId: uuid("lead_id").references(() => leads.id, { onDelete: "cascade" }),
+    destination: varchar("destination", { length: 255 }).notNull(),
+    duration: integer("duration").notNull(),
+    generatedPlan: jsonb("generated_plan").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    leadIdx: index("itineraries_lead_idx").on(table.leadId),
+  })
+)
+
+export const notifications = pgTable(
+  "notifications",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    leadId: uuid("lead_id").references(() => leads.id, { onDelete: "cascade" }),
+    message: text("message").notNull(),
+    scheduledDate: timestamp("scheduled_date", { withTimezone: true }).notNull(),
+    sent: boolean("sent").default(false).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    leadIdx: index("notifications_lead_idx").on(table.leadId),
+    scheduledIdx: index("notifications_scheduled_idx").on(table.scheduledDate),
+  })
+)
+
+export const agencyRoleEnum = pgEnum("agency_role", ["super_admin", "manager", "agent", "partner"])
+
+export const agencies = pgTable(
+  "agencies",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    name: varchar("name", { length: 255 }).notNull(),
+    city: varchar("city", { length: 255 }).notNull(),
+    phone: varchar("phone", { length: 50 }),
+    email: varchar("email", { length: 255 }),
+    isActive: boolean("is_active").default(true).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    cityIdx: index("agencies_city_idx").on(table.city),
+  })
+)
+
+export const agencyMembers = pgTable(
+  "agency_members",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    agencyId: uuid("agency_id").references(() => agencies.id, { onDelete: "cascade" }),
+    leadId: uuid("lead_id").references(() => leads.id, { onDelete: "cascade" }),
+    role: agencyRoleEnum("role").default("agent").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    agencyIdx: index("agency_members_agency_idx").on(table.agencyId),
+  })
+)
+
+export const referrals = pgTable(
+  "referrals",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    leadId: uuid("lead_id").references(() => leads.id, { onDelete: "cascade" }),
+    referralCode: varchar("referral_code", { length: 50 }).notNull(),
+    totalEarnings: numeric("total_earnings", { precision: 12, scale: 2 }).default("0").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    codeIdx: uniqueIndex("referrals_code_idx").on(table.referralCode),
+    leadIdx: index("referrals_lead_idx").on(table.leadId),
+  })
+)
