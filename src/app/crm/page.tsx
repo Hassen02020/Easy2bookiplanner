@@ -1,10 +1,10 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { LayoutDashboard, Hotel, Flame, Users, MessageSquare, Calendar, Settings, Plane, Ship, Compass, TrendingUp, Home } from "lucide-react"
+import { LayoutDashboard, Hotel, Flame, Users, MessageSquare, Calendar, Settings, Plane, Ship, Compass, TrendingUp, Home, BarChart3 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-type Tab = "dashboard" | "hotels" | "guesthouses" | "flights" | "boats" | "promotions" | "leads" | "conversations" | "reservations" | "excursions" | "marketing" | "settings"
+type Tab = "dashboard" | "hotels" | "guesthouses" | "flights" | "boats" | "promotions" | "leads" | "conversations" | "reservations" | "excursions" | "marketing" | "analytics" | "settings"
 
 const menuItems: { id: Tab; label: string; icon: typeof LayoutDashboard }[] = [
   { id: "dashboard", label: "📊 Dashboard", icon: LayoutDashboard },
@@ -18,6 +18,7 @@ const menuItems: { id: Tab; label: string; icon: typeof LayoutDashboard }[] = [
   { id: "conversations", label: "💬 Conversations IA", icon: MessageSquare },
   { id: "reservations", label: "📅 Réservations", icon: Calendar },
   { id: "marketing", label: "📈 Marketing", icon: TrendingUp },
+  { id: "analytics", label: "📊 Analytics", icon: BarChart3 },
   { id: "settings", label: "⚙ Paramètres", icon: Settings },
 ]
 
@@ -82,6 +83,7 @@ export default function CRMDashboard() {
         {activeTab === "conversations" && <ConversationsView />}
         {activeTab === "reservations" && <ReservationsView />}
         {activeTab === "marketing" && <MarketingView />}
+        {activeTab === "analytics" && <AnalyticsView />}
         {activeTab === "settings" && <SettingsView />}
       </main>
     </div>
@@ -262,6 +264,53 @@ function MarketingView() {
       </div>
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center text-gray-400">
         Aucune campagne marketing active
+      </div>
+    </div>
+  )
+}
+
+function AnalyticsView() {
+  const metrics = [
+    { label: "Nombre visiteurs", value: "—", color: "bg-blue-500" },
+    { label: "Nombre prospects", value: "—", color: "bg-green-500" },
+    { label: "Réservations", value: "—", color: "bg-purple-500" },
+    { label: "Taux conversion", value: "—", color: "bg-orange-500" },
+    { label: "Destinations populaires", value: "—", color: "bg-pink-500" },
+    { label: "Revenus estimés", value: "—", color: "bg-indigo-500" },
+    { label: "Promotions performantes", value: "—", color: "bg-red-500" },
+    { label: "Leads chauds", value: "—", color: "bg-yellow-500" },
+  ]
+  return (
+    <div>
+      <h2 className="text-2xl font-bold text-gray-900 mb-6">📊 Analytics</h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {metrics.map((metric) => (
+          <div key={metric.label} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className={cn("w-10 h-10 rounded-lg mb-4", metric.color)} />
+            <p className="text-2xl font-bold text-gray-900">{metric.value}</p>
+            <p className="text-sm text-gray-500 mt-1">{metric.label}</p>
+          </div>
+        ))}
+      </div>
+      <div className="mt-6 bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+        <h3 className="text-lg font-bold text-gray-900 mb-4">Lead Scoring</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="p-4 bg-red-50 rounded-lg border border-red-200">
+            <p className="font-bold text-red-700">🔥 Hot Lead</p>
+            <p className="text-sm text-gray-600 mt-1">Demande réservation, budget élevé, répond rapidement</p>
+            <p className="text-xs text-gray-400 mt-2">Action : notifier équipe + appel + WhatsApp</p>
+          </div>
+          <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
+            <p className="font-bold text-orange-700">🌤 Warm Lead</p>
+            <p className="text-sm text-gray-600 mt-1">Demande informations</p>
+            <p className="text-xs text-gray-400 mt-2">Action : suivi par email</p>
+          </div>
+          <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+            <p className="font-bold text-blue-700">❄ Cold Lead</p>
+            <p className="text-sm text-gray-600 mt-1">Visite simple</p>
+            <p className="text-xs text-gray-400 mt-2">Action : newsletter</p>
+          </div>
+        </div>
       </div>
     </div>
   )
