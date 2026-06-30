@@ -11,15 +11,16 @@ export async function POST(request: NextRequest) {
     const { messages, lang } = body
 
     const sessionUsage = await getSessionUsage()
-    if (sessionUsage.triggerPaywall) {
+    if (sessionUsage.isRejected) {
       return NextResponse.json({
-        content: "Vous avez atteint votre limite de messages gratuits. Débloquez l'accès complet pour continuer avec un conseiller Easy2Book.",
+        content: "Nous remarquons que vous avez consulté nos offres à plusieurs reprises sans finaliser de réservation. Pour mieux vous accompagner et finaliser votre projet, contactez directement notre équipe Easy2Book. 📞 +216 98140514",
         lang,
-        triggerPaywall: true,
+        triggerPaywall: false,
+        isRejected: true,
         session: {
           messageCount: sessionUsage.messageCount,
-          maxFreeMessages: sessionUsage.maxFreeMessages,
-          remaining: 0,
+          visitCount: sessionUsage.visitCount,
+          hasConfirmed: sessionUsage.hasConfirmed,
         },
         telemetry: await getTelemetryData(),
       })

@@ -3,14 +3,14 @@
 /**
  * sessionLimiter.ts
  *
- * Limiteur de jetons conversationnels pour Easy2Book.
- * Chaque utilisateur anonyme dispose de 3 messages gratuits.
- * Au-delà, un paywall est déclenché via le drapeau frontend `triggerPaywall`.
+ * Pas de limite de messages pour le chat.
+ * Détecte les clients qui reviennent plusieurs fois sans confirmer de réservation.
+ * Après 5 visites sans confirmation, le client est rejeté avec un message d'orientation.
  */
 
 import { cookies } from "next/headers"
 
-const MAX_FREE_MESSAGES = 15
+const MAX_VISITS_WITHOUT_CONFIRM = 5
 
 export interface SessionUsage {
   sessionId: string
@@ -19,13 +19,15 @@ export interface SessionUsage {
   remaining: number
   isAllowed: boolean
   triggerPaywall: boolean
+  visitCount: number
+  hasConfirmed: boolean
+  isRejected: boolean
 }
 
 const SESSION_COOKIE = "e2b_session_usage"
 
 /**
- * Vérifie si une session a encore des messages gratuits disponibles.
- * Crée un cookie de session si nécessaire.
+ * Vérifie si une session est autorisée à chatter.
  */
 export async function isSessionValid(sessionId: string): Promise<boolean> {
   const usage = await getSessionUsage()
@@ -33,86 +35,181 @@ export async function isSessionValid(sessionId: string): Promise<boolean> {
 }
 
 /**
- * Récupère ou initialise le compteur de messages d'une session.
+ * Récupère les infos de session. Pas de limite de messages.
+ * Détecte les visiteurs récurrents sans confirmation de réservation.
  */
 export async function getSessionUsage(): Promise<SessionUsage> {
   const cookieStore = await cookies()
   const existing = cookieStore.get(SESSION_COOKIE)
   const sessionId = cookieStore.get("e2b_session")?.value || "anonymous"
 
-  let count = 0
+  let messageCount = 0
+  let visitCount = 0
+  let hasConfirmed = false
+
   if (existing?.value) {
     try {
       const parsed = JSON.parse(existing.value)
-      count = Math.max(0, Number(parsed.messageCount) || 0)
+      messageCount = Math.max(0, Number(parsed.messageCount) || 0)
+      visitCount = Math.max(0, Number(parsed.visitCount) || 0)
+      hasConfirmed = Boolean(parsed.hasConfirmed)
     } catch {
-      count = 0
+      // reset
     }
   }
 
-  const remaining = Math.max(0, MAX_FREE_MESSAGES - count)
-  const isAllowed = count < MAX_FREE_MESSAGES
-  const triggerPaywall = !isAllowed
+  const isRejected = !hasConfirmed && visitCount >= MAX_VISITS_WITHOUT_CONFIRM
+  const isAllowed = !isRejected
+  const triggerPaywall = false
 
   return {
     sessionId,
-    messageCount: count,
-    maxFreeMessages: MAX_FREE_MESSAGES,
-    remaining,
+    messageCount,
+    maxFreeMessages: 0,
+    remaining: 0,
     isAllowed,
     triggerPaywall,
+    visitCount,
+    hasConfirmed,
+    isRejected,
   }
 }
 
 /**
- * Incrémente le compteur de messages d'une session.
+ * Incrémente le compteur de messages. Pas de limite.
  */
 export async function incrementSessionUsage(): Promise<SessionUsage> {
   const cookieStore = await cookies()
   const existing = cookieStore.get(SESSION_COOKIE)
   const sessionId = cookieStore.get("e2b_session")?.value || "anonymous"
 
-  let count = 0
+  let messageCount = 0
+  let visitCount = 0
+  let hasConfirmed = false
+
   if (existing?.value) {
     try {
       const parsed = JSON.parse(existing.value)
-      count = Math.max(0, Number(parsed.messageCount) || 0)
+      messageCount = Math.max(0, Number(parsed.messageCount) || 0)
+      visitCount = Math.max(0, Number(parsed.visitCount) || 0)
+      hasConfirmed = Boolean(parsed.hasConfirmed)
     } catch {
-      count = 0
+      // reset
     }
   }
 
-  count += 1
+  messageCount += 1
 
-  cookieStore.set(SESSION_COOKIE, JSON.stringify({ messageCount: count }), {
-    maxAge: 60 * 60 * 24 * 7, // 7 jours
+  cookieStore.set(SESSION_COOKIE, JSON.stringify({ messageCount, visitCount, hasConfirmed }), {
+    maxAge: 60 * 60 * 24 * 30, // 30 jours
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
   })
 
-  const remaining = Math.max(0, MAX_FREE_MESSAGES - count)
-  const isAllowed = count < MAX_FREE_MESSAGES
-  const triggerPaywall = !isAllowed
+  const isRejected = !hasConfirmed && visitCount >= MAX_VISITS_WITHOUT_CONFIRM
+  const isAllowed = !isRejected
+  const triggerPaywall = false
 
   return {
     sessionId,
-    messageCount: count,
-    maxFreeMessages: MAX_FREE_MESSAGES,
-    remaining,
+    messageCount,
+    maxFreeMessages: 0,
+    remaining: 0,
     isAllowed,
     triggerPaywall,
+    visitCount,
+    hasConfirmed,
+    isRejected,
   }
 }
 
 /**
- * Réinitialise le compteur de messages (après conversion ou paiement).
+ * Incrémente le compteur de visites (appelé à chaque nouvelle session de chat).
+ */
+export async function incrementVisitCount(): Promise<SessionUsage> {
+  const cookieStore = await cookies()
+  const existing = cookieStore.get(SESSION_COOKIE)
+  const sessionId = cookieStore.get("e2b_session")?.value || "anonymous"
+
+  let messageCount = 0
+  let visitCount = 0
+  let hasConfirmed = false
+
+  if (existing?.value) {
+    try {
+      const parsed = JSON.parse(existing.value)
+      messageCount = Math.max(0, Number(parsed.messageCount) || 0)
+      visitCount = Math.max(0, Number(parsed.visitCount) || 0)
+      hasConfirmed = Boolean(parsed.hasConfirmed)
+    } catch {
+      // reset
+    }
+  }
+
+  visitCount += 1
+
+  cookieStore.set(SESSION_COOKIE, JSON.stringify({ messageCount, visitCount, hasConfirmed }), {
+    maxAge: 60 * 60 * 24 * 30, // 30 jours
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+  })
+
+  const isRejected = !hasConfirmed && visitCount >= MAX_VISITS_WITHOUT_CONFIRM
+  const isAllowed = !isRejected
+
+  return {
+    sessionId,
+    messageCount,
+    maxFreeMessages: 0,
+    remaining: 0,
+    isAllowed,
+    triggerPaywall: false,
+    visitCount,
+    hasConfirmed,
+    isRejected,
+  }
+}
+
+/**
+ * Marque la session comme ayant confirmé une réservation.
+ */
+export async function confirmReservation(): Promise<void> {
+  const cookieStore = await cookies()
+  const existing = cookieStore.get(SESSION_COOKIE)
+
+  let messageCount = 0
+  let visitCount = 0
+
+  if (existing?.value) {
+    try {
+      const parsed = JSON.parse(existing.value)
+      messageCount = Math.max(0, Number(parsed.messageCount) || 0)
+      visitCount = Math.max(0, Number(parsed.visitCount) || 0)
+    } catch {
+      // reset
+    }
+  }
+
+  cookieStore.set(SESSION_COOKIE, JSON.stringify({ messageCount, visitCount, hasConfirmed: true }), {
+    maxAge: 60 * 60 * 24 * 30,
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+  })
+}
+
+/**
+ * Réinitialise le compteur (après conversion ou paiement).
  */
 export async function resetSessionUsage(): Promise<void> {
   const cookieStore = await cookies()
-  cookieStore.set(SESSION_COOKIE, JSON.stringify({ messageCount: 0 }), {
-    maxAge: 60 * 60 * 24 * 7,
+  cookieStore.set(SESSION_COOKIE, JSON.stringify({ messageCount: 0, visitCount: 0, hasConfirmed: false }), {
+    maxAge: 60 * 60 * 24 * 30,
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
