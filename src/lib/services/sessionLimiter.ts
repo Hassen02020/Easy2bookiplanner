@@ -1,5 +1,3 @@
-"use server"
-
 /**
  * sessionLimiter.ts
  *
@@ -11,6 +9,7 @@
 import { cookies } from "next/headers"
 
 const MAX_VISITS_WITHOUT_CONFIRM = 5
+const SESSION_COOKIE = "e2b_session_usage"
 
 export interface SessionUsage {
   sessionId: string
@@ -24,32 +23,21 @@ export interface SessionUsage {
   isRejected: boolean
 }
 
-const SESSION_COOKIE = "e2b_session_usage"
-
-/**
- * Vérifie si une session est autorisée à chatter.
- */
-export async function isSessionValid(sessionId: string): Promise<boolean> {
-  const usage = await getSessionUsage()
-  return usage.isAllowed
+function parseCookie(cookieHeader: string | null, name: string): string | undefined {
+  if (!cookieHeader) return undefined
+  const match = cookieHeader.match(new RegExp(`${name}=([^;]+)`))
+  return match ? match[1] : undefined
 }
 
-/**
- * Récupère les infos de session. Pas de limite de messages.
- * Détecte les visiteurs récurrents sans confirmation de réservation.
- */
-export async function getSessionUsage(): Promise<SessionUsage> {
-  const cookieStore = await cookies()
-  const existing = cookieStore.get(SESSION_COOKIE)
-  const sessionId = cookieStore.get("e2b_session")?.value || "anonymous"
-
+function buildUsage(cookieHeader: string | null, sessionId: string): SessionUsage {
+  const raw = parseCookie(cookieHeader, SESSION_COOKIE)
   let messageCount = 0
   let visitCount = 0
   let hasConfirmed = false
 
-  if (existing?.value) {
+  if (raw) {
     try {
-      const parsed = JSON.parse(existing.value)
+      const parsed = JSON.parse(decodeURIComponent(raw))
       messageCount = Math.max(0, Number(parsed.messageCount) || 0)
       visitCount = Math.max(0, Number(parsed.visitCount) || 0)
       hasConfirmed = Boolean(parsed.hasConfirmed)
@@ -60,7 +48,6 @@ export async function getSessionUsage(): Promise<SessionUsage> {
 
   const isRejected = !hasConfirmed && visitCount >= MAX_VISITS_WITHOUT_CONFIRM
   const isAllowed = !isRejected
-  const triggerPaywall = false
 
   return {
     sessionId,
@@ -68,11 +55,39 @@ export async function getSessionUsage(): Promise<SessionUsage> {
     maxFreeMessages: 0,
     remaining: 0,
     isAllowed,
-    triggerPaywall,
+    triggerPaywall: false,
     visitCount,
     hasConfirmed,
     isRejected,
   }
+}
+
+/**
+ * Vérifie si une session est autorisée à chatter.
+ * Utilise next/headers cookies (pour les server components/actions).
+ */
+export async function isSessionValid(sessionId: string): Promise<boolean> {
+  const usage = await getSessionUsage()
+  return usage.isAllowed
+}
+
+/**
+ * Récupère les infos de session via next/headers.
+ */
+export async function getSessionUsage(): Promise<SessionUsage> {
+  const cookieStore = await cookies()
+  const sessionId = cookieStore.get("e2b_session")?.value || "anonymous"
+  const cookieHeader = cookieStore.toString()
+  return buildUsage(cookieHeader, sessionId)
+}
+
+/**
+ * Version légère pour API routes : lit directement depuis le header de requête.
+ */
+export function getSessionUsageFromRequest(request: Request): SessionUsage {
+  const cookieHeader = request.headers.get("cookie") || ""
+  const sessionId = parseCookie(cookieHeader, "e2b_session") || "anonymous"
+  return buildUsage(cookieHeader, sessionId)
 }
 
 /**
@@ -101,7 +116,7 @@ export async function incrementSessionUsage(): Promise<SessionUsage> {
   messageCount += 1
 
   cookieStore.set(SESSION_COOKIE, JSON.stringify({ messageCount, visitCount, hasConfirmed }), {
-    maxAge: 60 * 60 * 24 * 30, // 30 jours
+    maxAge: 60 * 60 * 24 * 30,
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
@@ -110,7 +125,6 @@ export async function incrementSessionUsage(): Promise<SessionUsage> {
 
   const isRejected = !hasConfirmed && visitCount >= MAX_VISITS_WITHOUT_CONFIRM
   const isAllowed = !isRejected
-  const triggerPaywall = false
 
   return {
     sessionId,
@@ -118,7 +132,7 @@ export async function incrementSessionUsage(): Promise<SessionUsage> {
     maxFreeMessages: 0,
     remaining: 0,
     isAllowed,
-    triggerPaywall,
+    triggerPaywall: false,
     visitCount,
     hasConfirmed,
     isRejected,
@@ -126,7 +140,7 @@ export async function incrementSessionUsage(): Promise<SessionUsage> {
 }
 
 /**
- * Incrémente le compteur de visites (appelé à chaque nouvelle session de chat).
+ * Incrémente le compteur de visites.
  */
 export async function incrementVisitCount(): Promise<SessionUsage> {
   const cookieStore = await cookies()
@@ -151,7 +165,7 @@ export async function incrementVisitCount(): Promise<SessionUsage> {
   visitCount += 1
 
   cookieStore.set(SESSION_COOKIE, JSON.stringify({ messageCount, visitCount, hasConfirmed }), {
-    maxAge: 60 * 60 * 24 * 30, // 30 jours
+    maxAge: 60 * 60 * 24 * 30,
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
@@ -204,7 +218,7 @@ export async function confirmReservation(): Promise<void> {
 }
 
 /**
- * Réinitialise le compteur (après conversion ou paiement).
+ * Réinitialise le compteur.
  */
 export async function resetSessionUsage(): Promise<void> {
   const cookieStore = await cookies()

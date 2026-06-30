@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { chatRequestSchema } from "@/lib/ai/tools"
 import { getTelemetryData } from "@/lib/telemetry"
-import { getSessionUsage, incrementSessionUsage } from "@/lib/services/sessionLimiter"
+import { getSessionUsageFromRequest } from "@/lib/services/sessionLimiter"
 import { GoogleGenAI } from "@google/genai"
 
 export async function POST(request: NextRequest) {
@@ -10,7 +10,7 @@ export async function POST(request: NextRequest) {
     const body = chatRequestSchema.parse(await request.json())
     const { messages, lang } = body
 
-    const sessionUsage = await getSessionUsage()
+    const sessionUsage = getSessionUsageFromRequest(request)
     if (sessionUsage.isRejected) {
       return NextResponse.json({
         content: "Nous remarquons que vous avez consulté nos offres à plusieurs reprises sans finaliser de réservation. Pour mieux vous accompagner et finaliser votre projet, contactez directement notre équipe Easy2Book. 📞 +216 98140514",
@@ -25,8 +25,6 @@ export async function POST(request: NextRequest) {
         telemetry: await getTelemetryData(),
       })
     }
-
-    await incrementSessionUsage()
 
     const telemetry = await getTelemetryData()
 
